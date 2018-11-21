@@ -80,11 +80,9 @@ def buildStingray(root, mname, material):
         typ = texturetype[2]
         texture = texturetype[0]
         realpath = os.path.splitext(texture)[0]+'.tif'
-        # print "raw realpath", realpath, " texture ", texture, "type ", typ
         realpath = realpath.replace('\\', os.sep)
         if not os.path.isabs(realpath):
-            # TODO: check this on Windows
-            realpath = os.path.normpath('%s/dummy/%s' % (root, realpath))
+            realpath = os.path.normpath('%s/%s' % (root, realpath))
 
         try:
             fn, fext = os.path.splitext(realpath)
@@ -150,6 +148,9 @@ def buildStingray(root, mname, material):
 def read(filename, prefix=''):
     global textureList
     textureList = {}
+    # Normalize the filename for OS-independent separators
+    filename = filename.replace('\\', os.sep)
+
     root, file = os.path.split(filename)
     data = read_owmat.read(filename)
     if not data:
