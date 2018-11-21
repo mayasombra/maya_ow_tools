@@ -1,0 +1,225 @@
+global string $mapmodelimportas;
+global string $mapImportCheckboxes;
+global string $mapImportModelCheckboxes;
+global string $modelImportCheckboxes;
+global string $mapHideModelCheckbox;
+global string $settings;
+
+proc int getSetting(string $settingName)
+{
+	global string $settings;
+	string $buffer[];
+	$settings = strip($settings);
+	$settingName = strip($settingName);
+	$numTokens = `tokenize $settings "-" $buffer`;
+	int $i = 0;
+	string $keys[];
+	string $values[];
+	for ($t in $buffer){
+		string $b[];
+		$v = `tokenize $t " " $b`;
+		$keys[$i] = strip($b[0]);
+		$values[$i] = strip($b[1]);
+		$i++;
+	}
+	int $j = stringArrayFind($settingName, 0, $keys);
+	// print("j = "+$j+"\n");
+	if (stringArrayFind($settingName, 0, $keys) >-1){
+		// print("Setting Name: "+$keys[$j]+" = \""+$values[$j]+"\"\n");
+		return int($values[$j]);
+	}
+	return 0;
+}
+
+global proc setMapsImportModelsToggle(){
+	global string $mapImportCheckboxes;
+	global string $mapmodelimportas;
+	global string $mapImportModelCheckboxes;
+	if (`checkBoxGrp -q -v1 $mapImportCheckboxes` == 1){
+		optionMenu -e -enable true $mapmodelimportas;
+		checkBoxGrp -e -enable true $mapImportModelCheckboxes;
+	}else{
+		optionMenu -e -enable false $mapmodelimportas;
+		checkBoxGrp -e -enable false $mapImportModelCheckboxes;
+	}
+}
+
+global proc setMapsImportModelObjectsToggle(){
+	global string $mapmodelimportas;
+	global string $mapImportModelCheckboxes;
+	if (`checkBoxGrp -q -v2 $mapImportModelCheckboxes` == 1){
+		if (`optionMenu -q -sl $mapmodelimportas` == 2){
+			checkBoxGrp -e -enable3 false $mapImportModelCheckboxes;
+		}else{
+			checkBoxGrp -e -enable3 true $mapImportModelCheckboxes;
+		}
+	}else{
+		checkBoxGrp -e -enable3 false $mapImportModelCheckboxes;
+	}
+}
+
+global proc setMapsImportModelsAsToggle(){
+	global string $mapmodelimportas;
+	global string $mapImportModelCheckboxes;
+	if (`optionMenu -q -sl $mapmodelimportas` == 2){
+		checkBoxGrp -e -enable3 false $mapImportModelCheckboxes;
+	}else{
+		if (`checkBoxGrp -q -v2 $mapImportModelCheckboxes` == 1){
+			checkBoxGrp -e -enable3 true $mapImportModelCheckboxes;
+		}else{
+			checkBoxGrp -e -enable3 false $mapImportModelCheckboxes;
+		}
+	}
+}
+
+global proc int OWMImporterOptions(string $parent, string $action, string $options, string $callback)
+ {
+	global string $mapmodelimportas;
+	global string $mapImportCheckboxes;
+	global string $mapImportModelCheckboxes;
+	global string $modelImportCheckboxes;
+	global string $mapHideModelCheckbox;
+	global string $settings;
+	$settings = $options;
+	// if we need to create the user interface...
+	if ($action == "post") {
+		// attachs the GUI to the correct parent layout
+		setParent $parent;
+		// create a simple layout for the controls
+		columnLayout -adj true;
+			frameLayout -collapsable true -label "Global Options";
+				columnLayout;
+					checkBox -l "Import Textures" -v true -en false;
+					checkBox -l "Hide Reference Models" -v true;
+				setParent ..;
+			setParent ..;
+			frameLayout -collapsable true -label "Model Options";
+				columnLayout;
+					int $ModelImportMaterials = getSetting("ModelImportMaterials");
+					int $ModelImportBones = getSetting("ModelImportBones");
+					int $ModelImportEmpties = getSetting("ModelImportEmpties");
+					$modelImportCheckboxes = `checkBoxGrp
+						-numberOfCheckBoxes 3
+						-l "Models Import: "
+						-la3 "Materials" "Bones" "Empty Objects"
+						-va3 $ModelImportMaterials $ModelImportBones $ModelImportEmpties
+						-enable3 false`;
+				setParent ..;
+			setParent ..;
+			
+			frameLayout -collapsable true -label "Map Options";
+				columnLayout;
+					int $MatImportTextures = getSetting("MatImportTextures");
+					int $MapImportModels = getSetting("MapImportModels");
+					int $MapImportMaterials = getSetting("MapImportMaterials");
+					int $MapImportLights = getSetting("MapImportLights");
+					int $MapImportModelsAs = getSetting("MapImportModelsAs");
+					int $MapImportObjectsLarge = getSetting("MapImportObjectsLarge");
+					int $MapImportObjectsDetail = getSetting("MapImportObjectsDetail");
+					int $MapImportObjectsPhysics = getSetting("MapImportObjectsPhysics");
+					int $MapHideReferenceModels = getSetting("MapHideReferenceModels");
+					$mapImportCheckboxes = `checkBoxGrp
+						-numberOfCheckBoxes 3
+						-l "Maps Import: "
+						-la3 "Models" "Materials" "Lights"
+						-ann "Choose what to import. NOTE: Lights are not yet exportable and are thus not importable."
+						-va3 $MapImportModels $MapImportMaterials $MapImportLights
+						-changeCommand1 "setMapsImportModelsToggle"`;
+					$mapmodelimportas = `optionMenu -l "Import Models as" -changeCommand "setMapsImportModelsAsToggle"`;
+						menuItem -l "Models" -ann "Loads the models for the level.";
+						menuItem -l "Locators" -ann "Replaces models with a locator (null) with the proper location, rotation and scale.";
+					optionMenu -e -sl $MapImportModelsAs $mapmodelimportas;
+					$mapImportModelCheckboxes = `checkBoxGrp
+						-numberOfCheckBoxes 3
+						-l "Object Import: "
+						-changeCommand2 "setMapsImportModelObjectsToggle"
+						-la3 "Large Models" "Detail Models" "Physics Model"
+						-ann "Large models are for buildings, trees, and landscapes. Detail models are for video games, cars, and laptops. The Physics model is used for collision detection."
+						-va3 $MapImportObjectsLarge $MapImportObjectsDetail $MapImportObjectsPhysics`;
+					$mapHideModelCheckbox = `checkBox -l "Hide Reference Models" -ann "Hide the reference models." -v $MapHideReferenceModels`;
+				setParent ..;
+			setParent ..;
+			
+			//frameLayout -collapsable true -label "Material Options";
+			//setParent ..;
+			
+		setMapsImportModelsToggle();
+		setMapsImportModelsAsToggle();
+		setMapsImportModelObjectsToggle();
+	}
+	else
+	if ($action == "query") {
+		string $option="-MapImportModels ";
+
+		if(`checkBoxGrp -q -v1 $mapImportCheckboxes`)
+			$option += "1 ";
+		else
+			$option += "0 ";
+
+		$option+="-MatImportTextures ";
+		if(`checkBoxGrp -q -v2 $mapImportCheckboxes`)
+			$option += "1 ";
+		else
+			$option += "0 ";
+			
+		$option+="-MapImportMaterials ";
+		if(`checkBoxGrp -q -v2 $mapImportCheckboxes`)
+			$option += "1 ";
+		else
+			$option += "0 ";
+
+		$option+="-MapImportLights ";
+		if(`checkBoxGrp -q -v3 $mapImportCheckboxes`)
+			$option += "1 ";
+		else
+			$option += "0 ";
+
+		$option+="-MapImportModelsAs ";
+		$option += `optionMenu -q -sl $mapmodelimportas`;
+		$option += " ";
+
+		$option+="-MapImportObjectsLarge ";
+		if(`checkBoxGrp -q -v1 $mapImportModelCheckboxes`)
+			$option += "1 ";
+		else
+			$option += "0 ";
+		$option+="-MapImportObjectsDetail ";
+		if(`checkBoxGrp -q -v2 $mapImportModelCheckboxes`)
+			$option += "1 ";
+		else
+			$option += "0 ";
+		$option+="-MapImportObjectsPhysics ";
+		if(`checkBoxGrp -q -v3 $mapImportModelCheckboxes`)
+			$option += "1 ";
+		else
+			$option += "0 ";
+
+		$option+="-ModelImportMaterials ";
+		if(`checkBoxGrp -q -v1 $modelImportCheckboxes`)
+			$option += "1 ";
+		else
+			$option += "0 ";
+			
+		$option+="-ModelImportBones ";
+		if(`checkBoxGrp -q -v2 $modelImportCheckboxes`)
+			$option += "1 ";
+		else
+			$option += "0 ";
+			
+		$option+="-ModelImportEmpties ";
+		if(`checkBoxGrp -q -v3 $modelImportCheckboxes`)
+			$option += "1 ";
+		else
+			$option += "0 ";
+			
+		$option+="-MapHideReferenceModels ";
+		if(`checkBox -q -v $mapHideModelCheckbox`)
+			$option += "1 ";
+		else
+			$option += "0 ";
+
+		eval( $callback + "\"" + $option + "\"" );
+	}
+
+	return 1;
+}
