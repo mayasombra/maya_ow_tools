@@ -1,5 +1,6 @@
 import os
 import math
+
 from types import TupleType
 import maya.cmds as cmds
 import maya.api.OpenMaya as OpenMaya
@@ -257,23 +258,44 @@ def importMesh(rootName, armature, meshData):
             clusterName = cmds.skinCluster(meshName, tuple(jointList),
                                            skinMethod=1)
             cmds.select(clusterName, r=True)
+            singletons = {}
             for index, weightdata in bwd.items():
                 skinData = []
                 sumWeights = 0
-                for boneName, weight in weightdata.items():
-                    # The weights in the mesh are rounded by Maya, and as a
-                    # result can occasionally overflow. We compensate for this
-                    # by arbitrarily removing weight from the last joint. This
-                    # doesn't change things appreciably since we're subtracting
-                    # out rounding error.
-                    if sumWeights + weight > 1.0:
-                        weight = 1.0 - sumWeights
-                    skinData += [(boneName, weight)]
-                    sumWeights += weight
-                vertexNum = "%s.vtx[%i]" % (meshName, index)
-                # print ("Skinning v#: ", vertexNum, " skinData: ", skinData)
+                if len(weightdata) == 1:
+                    # If a vertex only has a single bone, we create a lookup
+                    # keyed by the bone to find all the vertices it controls.
+                    # This lets us execute one command for all those vertices.
+                    # In OW models, this is roughly 40% of the vertices, and
+                    # reduces the import time correspondingly.
+                    bone, weight = weightdata.items()[0]
+                    if singletons.get(bone) is None:
+                        singletons[bone] = []
+                    singletons[bone] += [index]
+                else:
+                    for boneName, weight in weightdata.items():
+                        # The weights in the mesh are rounded by Maya, and as a
+                        # result can occasionally overflow. We compensate for
+                        # this by arbitrarily removing weight from the last
+                        # joint. This doesn't change things appreciably since
+                        # we're subtracting out rounding error.
+                        if sumWeights + weight > 1.0:
+                            weight = 1.0 - sumWeights
+                        skinData += [(boneName, weight)]
+                        sumWeights += weight
+                    vertexNum = "%s.vtx[%i]" % (meshName, index)
+                    # print ("Skin v#: ", vertexNum, " skinData: ", skinData)
+                    cmds.skinPercent("%s" % tuple(clusterName),
+                                     vertexNum, transformValue=skinData)
+
+            # Now put all the singleton weights into the mesh.
+            for bone, vertices in singletons.items():
+                cmds.select("%s.vtx[%i]" % (meshName, vertices[0]))
+                for i in range(1, len(vertices)):
+                    cmds.select("%s.vtx[%i]" % (meshName, vertices[i]),
+                                add=True)
                 cmds.skinPercent("%s" % tuple(clusterName),
-                                 vertexNum, transformValue=skinData)
+                                 transformValue=[(bone, 1.0)])
 
     return rdata
 
