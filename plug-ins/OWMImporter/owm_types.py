@@ -58,15 +58,20 @@ class OWMATMaterial:
 
 
 class OWMDLFile:
-    def __init__(self, header, bones, meshes, empties):
+    def __init__(self, header, bones, refpose_bones, meshes, empties,
+                 cloths, guid):
         self.header = header
         self.bones = bones
+        self.refpose_bones = refpose_bones
         self.meshes = meshes
         self.empties = empties
+        self.cloths = cloths
+        self.guid = guid
 
 
 class OWMDLHeader:
     structFormat = ['<HH', str, str, '<HII']
+    guidFormat = ['<I']
 
     def __init__(self, major, minor, material, name,
                  boneCount, meshCount, emptyCount):
@@ -131,6 +136,7 @@ class OWMDLBone:
 
 class OWMDLEmpty:
     structFormat = [str, '<fff', '<ffff']
+    exFormat = [str]
 
     def __init__(self, name, position, rotation):
         self.name = name
@@ -283,3 +289,33 @@ class OWANIMFrameValue:
         self.keyValue1 = keyValue1
         self.keyValue2 = keyValue2
         self.keyValue3 = keyValue3
+
+
+class OWMDLCloth:
+    structFormat = [str, '<I']
+    beforeFmt = ['<I']
+
+    def __init__(self, name, meshes):
+        self.name = name
+        self.meshes = meshes
+
+
+class OWMDLClothMesh:
+    structFormat = ['<II', str]
+    pinnedVertFmt = ['<I']
+
+    def __init__(self, name, id, pinnedVerts):
+        self.name = name
+        self.id = id
+        self.pinnedVerts = pinnedVerts
+
+
+class OWMDLRefposeBone:
+    structFormat = [str, '<h', '<fff', '<fff', '<fff']
+
+    def __init__(self, name, parent, pos, scale, rot):
+        self.name = name
+        self.parent = parent
+        self.pos = pos
+        self.scale = scale
+        self.rot = rot
