@@ -1,179 +1,102 @@
+"""A plugin designed to import and export OW formats from Autodesk Maya"""
+
+# OW formats import / export plugin for Maya
+
 import os
-import sys
-import re
+import os.path
+
+import maya.mel as mel
 import maya.cmds as cmds
 import maya.OpenMayaMPx as OpenMayaMPx
 
-from OWMImporter import import_owmat
-from OWMImporter import import_owmap
 from OWMImporter import import_owmdl
-from OWMImporter import import_owanim
 
-PluginName = "Overwatch Importer"
 Version = "0.7.0 Alpha"
-settings = None
 
 
-class ImportOverwatchSettings:
-    def __init__(self,
-                 MapImportModels=True,
-                 MatImportTextures=True,
-                 MapImportMaterials=True,
-                 MapImportLights=True,
-                 MapImportModelsAs=1,
-                 MapImportObjectsLarge=True,
-                 MapImportObjectsDetail=True,
-                 MapImportObjectsPhysics=False,
-                 ModelImportMaterials=True,
-                 ModelImportBones=True,
-                 ModelImportEmpties=False,
-                 MapHideReferenceModels=True):
-        self.MatImportTextures = int(MatImportTextures)
-
-        self.MapImportModels = int(MapImportModels)
-        self.MapImportMaterials = int(MapImportMaterials)
-        self.MapImportLights = int(MapImportLights)
-        self.MapImportModelsAs = int(MapImportModelsAs)
-
-        self.MapImportObjectsLarge = int(MapImportObjectsLarge)
-        self.MapImportObjectsDetail = int(MapImportObjectsDetail)
-        self.MapImportObjectsPhysics = int(MapImportObjectsPhysics)
-
-        self.ModelImportMaterials = int(ModelImportMaterials)
-        self.ModelImportBones = int(ModelImportBones)
-        self.ModelImportEmpties = int(ModelImportEmpties)
-
-        self.MapHideReferenceModels = int(MapHideReferenceModels)
-
-    def toString(self):
-        string = "-%s %s" % ("MapImportModels",
-                             self.MapImportModels)
-        string += "-%s %s" % ("MatImportTextures",
-                              self.MatImportTextures)
-        string += "-%s %s" % ("MapImportMaterials",
-                              self.MapImportMaterials)
-        string += "-%s %s" % ("MapImportLights",
-                              self.MapImportLights)
-        string += "-%s %s" % ("MapImportModelsAs",
-                              self.MapImportModelsAs)
-        string += "-%s %s" % ("MapImportObjectsLarge",
-                              self.MapImportObjectsLarge)
-        string += "-%s %s" % ("MapImportObjectsDetail",
-                              self.MapImportObjectsDetail)
-        string += "-%s %s" % ("MapImportObjectsPhysics",
-                              self.MapImportObjectsPhysics)
-        string += "-%s %s" % ("ModelImportMaterials",
-                              self.ModelImportMaterials)
-        string += "-%s %s" % ("ModelImportBones",
-                              self.ModelImportBones)
-        string += "-%s %s" % ("MapHideReferenceModels",
-                              self.MapHideReferenceModels)
-
-        return string
-
-    def fromString(self, string):
-        string = string[1:]
-        tokens = string.split('-')
-        values = {}
-        # print tokens
-        for t in tokens:
-            o = t.split()
-            values[o[0].strip()] = o[1].strip()
-
-        self.MapImportModels = int(values["MapImportModels"])
-        self.MatImportTextures = int(values["MatImportTextures"])
-        self.MapImportMaterials = int(values["MapImportMaterials"])
-        self.MapImportLights = int(values["MapImportLights"])
-        self.MapImportModelsAs = int(values["MapImportModelsAs"])
-        self.MapImportObjectsLarge = int(values["MapImportObjectsLarge"])
-        self.MapImportObjectsDetail = int(values["MapImportObjectsDetail"])
-        self.MapImportObjectsPhysics = int(values["MapImportObjectsPhysics"])
-        self.ModelImportMaterials = int(values["ModelImportMaterials"])
-        self.ModelImportBones = int(values["ModelImportBones"])
-        self.MapHideReferenceModels = int(values["MapHideReferenceModels"])
+def __import_owmodel__():
+    import_file = __importfile_dialog__(
+        "OWMDL Files (*.owmdl)", "Import OWMDL")
+    if import_file:
+        import_owmdl.read(import_file, None)
 
 
-# main Command
-class ImportOverWatch(OpenMayaMPx.MPxFileTranslator):
-    global settings
-
-    def __init__(self):
-        OpenMayaMPx.MPxFileTranslator.__init__(self)
-
-    # Can not be Exported
-    def canBeOpened(self):
-        return False
-
-    # Can Import
-    def haveReadMethod(self):
-        return True
-
-    # Filters and Extensions
-    def defaultExtension(self):
-        return "OWMdl"
-
-    def filter(self):
-        return "*.OWMdl *.OWMap *.OWMat *.OWAnim"
-
-    def readFile(self, file, options):
-        # print "Supplied Options: %s"%options
-        options = re.sub('[;]', '', options)
-        settings.fromString(options)
-
-        self.filepath = os.path.normpath(file.fullName())
-        fpath, fext = os.path.splitext(self.filepath)
-        fpath, fname = os.path.split(fpath)
-        fpath = os.path.normpath(fpath)
-        print "fpath: %s, fname: %s, fext: %s" % (fpath, fname, fext)
-        if cmds.upAxis(q=True, axis=True) != "y":
-            cmds.upAxis(ax='y', rv=True)
-
-        if(fext.lower() == ".owmap"):
-            print("loading map...")
-            import_owmap.read(self.filepath, settings)
-        elif(fext.lower() == ".owmdl"):
-            print("loading model...")
-            import_owmdl.read(self.filepath, settings)
-        elif(fext.lower() == ".owmat"):
-            print("loading material...")
-            import_owmat.read(self.filepath)
-        elif(fext.lower() == ".owanim"):
-            print("loading animation...")
-            import_owanim.read(self.filepath, settings)
-        else:
-            return 1
-
-    # Read the File
-    def reader(self, file, options, mode):
-        return self.readFile(file, options)
+def __log_info__(format_str=""):
+    """Logs a line to the console"""
+    print "[OWImporter] " + format_str
 
 
-# Creator
-def translatorCreator():
-    print ("// %s, v%s" % (PluginName, Version))
-    return OpenMayaMPx.asMPxPtr(ImportOverWatch())
+def __about_window__():
+    """Present the about information"""
+    cmds.confirmDialog(
+        message="An OW Formats import and export plugin for Autodesk Maya.",
+        button=['OK'], defaultButton='OK', title="About OW Tools")
 
 
-# initialize the script plug-in
-def initializePlugin(mobject):
-    global settings
-    mplugin = OpenMayaMPx.MFnPlugin(mobject, "Kjasi", Version, "Any")
-    settings = ImportOverwatchSettings()
-    try:
-        mplugin.registerFileTranslator(
-            PluginName, None, translatorCreator,
-            "OWMImporterOptions", settings.toString())
-    except:
-        sys.stderr.write(
-            "Failed to register command: %s\n" % "OverWatchImporter")
-        raise
+def __importfile_dialog__(filter_str="", caption_str=""):
+    """Ask the user for an input file"""
+    if cmds.about(version=True)[:4] == "2012":
+        import_from = cmds.fileDialog2(
+            fileMode=1, fileFilter=filter_str, caption=caption_str)
+    else:
+        import_from = cmds.fileDialog2(fileMode=1,
+                                       dialogStyle=2,
+                                       fileFilter=filter_str,
+                                       caption=caption_str)
+
+    if not import_from or import_from[0].strip() == "":
+        return None
+
+    path = import_from[0].strip()
+    path_split = os.path.splitext(path)
+    if path_split[1] == ".*":
+        path = path_split
+
+    return path
 
 
-# uninitialize the script plug-in
-def uninitializePlugin(mobject):
-    mplugin = OpenMayaMPx.MFnPlugin(mobject)
-    try:
-        mplugin.deregisterFileTranslator(PluginName)
-    except:
-        sys.stderr.write(
-            "Failed to unregister command: OverwatchImporter\n")
+def __reload_plugin__():
+    """Reloads the plugin, not all Maya versions support this"""
+    cmds.unloadPlugin("OWIMenus.py")
+    cmds.loadPlugin("OWIMenus.py")
+
+
+def __remove_menu__():
+    """Removes the plugin menu"""
+    if cmds.control("OWToolsMenu", exists=True):
+        cmds.deleteUI("OWToolsMenu", menu=True)
+
+
+def __create_menu__():
+    """Creates the plugin menu"""
+    __remove_menu__()
+
+    # Create the base menu object
+    cmds.setParent(mel.eval("$tmp = $gMainWindow"))
+    menu = cmds.menu("OWToolsMenu", label="OW Tools", tearOff=True)
+
+    # Model menu controls
+    cmds.menuItem(label="Model", subMenu=True)
+
+    cmds.menuItem(label="Import OWMDL File",
+                  annotation="Imports an OW Model File",
+                  command=lambda x: __import_owmodel__())
+
+    cmds.setParent(menu, menu=True)
+    # cmds.menuItem(divider=True)
+
+    # Reload and about controls
+    cmds.menuItem(label="Reload Plugin", command=lambda x: __reload_plugin__(
+    ), annotation="Attempts to reload the plugin")
+    cmds.menuItem(label="About", command=lambda x: __about_window__())
+
+
+def initializePlugin(m_object):
+    """Register the plugin"""
+    OpenMayaMPx.MFnPlugin(m_object, "mayasombra", Version, "Any")
+    __create_menu__()
+
+
+def uninitializePlugin(m_object):
+    """Unregister the plugin"""
+    __remove_menu__()
