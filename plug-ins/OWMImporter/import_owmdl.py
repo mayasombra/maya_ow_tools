@@ -18,6 +18,9 @@ data = None
 rootObject = None
 BoneNames = []
 
+LOG_DEBUG_STATS = False
+LOG_SKIN_DETAILS = False
+
 
 def newBoneName():
     global BoneNames
@@ -72,6 +75,7 @@ def importArmature(parentName):
         for bone in bones:
             parent = getBoneName(bone.parent)
             if parent is not None:
+                # This select is necessary to get the bone parenting to work.
                 cmds.select(d=True)
 
             pos = adjustAxis(bone.pos)
@@ -80,7 +84,8 @@ def importArmature(parentName):
                               bone.rot[2], bone.rot[3])
             erot = qrot.asEulerRotation()
 
-            bbone = cmds.joint(name=bone.name, rad=0.05,
+            bbone = cmds.joint(name=bone.name,
+                               rad=0.05,
                                p=(pos[0], pos[1], pos[2]),
                                s=(scale[0], scale[1], scale[2]),
                                o=tuple(math.degrees(x) for x in [
@@ -259,10 +264,14 @@ def importMesh(rootName, armature, meshData):
                                            skinMethod=1)
             cmds.select(clusterName, r=True)
             singletons = {}
+            total = 0
+            singleton = 0
             for index, weightdata in bwd.items():
+                total += 1
                 skinData = []
                 sumWeights = 0
                 if len(weightdata) == 1:
+                    singleton += 1
                     # If a vertex only has a single bone, we create a lookup
                     # keyed by the bone to find all the vertices it controls.
                     # This lets us execute one command for all those vertices.
@@ -284,7 +293,8 @@ def importMesh(rootName, armature, meshData):
                         skinData += [(boneName, weight)]
                         sumWeights += weight
                     vertexNum = "%s.vtx[%i]" % (meshName, index)
-                    # print ("Skin v#: ", vertexNum, " skinData: ", skinData)
+                    if LOG_SKIN_DETAILS:
+                        print "Skin v#: ", vertexNum, " skinData: ", skinData
                     cmds.skinPercent("%s" % tuple(clusterName),
                                      vertexNum, transformValue=skinData)
 
@@ -297,6 +307,10 @@ def importMesh(rootName, armature, meshData):
                 cmds.skinPercent("%s" % tuple(clusterName),
                                  transformValue=[(bone, 1.0)])
 
+    if LOG_DEBUG_STATS:
+        print "total: ", total,
+        print " singletons: ", singleton,
+        print " singleton bones: ", len(singletons)
     return rdata
 
 
