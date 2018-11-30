@@ -1,9 +1,11 @@
 import os
 import math
+import time
 
 from types import TupleType
 import maya.cmds as cmds
 import maya.api.OpenMaya as OpenMaya
+import maya.api.OpenMayaAnim as OpenMayaAnim
 from maya.api.OpenMaya import MVector as Vector
 from maya.api.OpenMaya import MQuaternion as Quaternion
 
@@ -18,6 +20,7 @@ data = None
 rootObject = None
 BoneNames = []
 
+LOG_TIMING_STATS = True
 LOG_DEBUG_STATS = False
 LOG_SKIN_DETAILS = False
 
@@ -256,61 +259,61 @@ def importMesh(rootName, armature, meshData):
 
     # Attach Bones
     if armature:
+        start = time.time()
         bwd = getBoneWeights(boneData)
         if len(bwd) > 0:
             cmds.select(rootObject, r=True)
             jointList = cmds.ls(dag=True, type='joint', sl=True)
             clusterName = cmds.skinCluster(meshName, tuple(jointList),
                                            skinMethod=1)
+            # Build the bone indices from the skin's view of bones
+            # since that ordering is used by the OpenMaya calls.
+            mfnSkin = OpenMayaAnim.MFnSkinCluster(toMObject(clusterName[0]))
+            meshDag = toMDagPath(meshName)
+            influences = influenceObjects(clusterName[0])
+            jointLookup = dict((y.split('|')[-1], x)
+                               for (x, y) in enumerate(influences))
+
+            numVerts = cmds.polyEvaluate(meshName, v=True)
+            numJoints = len(jointList)
+
             cmds.select(clusterName, r=True)
-            singletons = {}
-            total = 0
-            singleton = 0
+            apiVertices = OpenMaya.MIntArray(numVerts, 0)
+            apiJointIndices = OpenMaya.MIntArray(numJoints, 0)
+            for i in range(numJoints):
+                apiJointIndices[i] = i
+
+            apiWeights = OpenMaya.MDoubleArray(numVerts * numJoints, 0)
+
             for index, weightdata in bwd.items():
-                total += 1
+                apiVertices[index] = index
                 skinData = []
                 sumWeights = 0
-                if len(weightdata) == 1:
-                    singleton += 1
-                    # If a vertex only has a single bone, we create a lookup
-                    # keyed by the bone to find all the vertices it controls.
-                    # This lets us execute one command for all those vertices.
-                    # In OW models, this is roughly 40% of the vertices, and
-                    # reduces the import time correspondingly.
-                    bone, weight = weightdata.items()[0]
-                    if singletons.get(bone) is None:
-                        singletons[bone] = []
-                    singletons[bone] += [index]
-                else:
-                    for boneName, weight in weightdata.items():
-                        # The weights in the mesh are rounded by Maya, and as a
-                        # result can occasionally overflow. We compensate for
-                        # this by arbitrarily removing weight from the last
-                        # joint. This doesn't change things appreciably since
-                        # we're subtracting out rounding error.
-                        if sumWeights + weight > 1.0:
-                            weight = 1.0 - sumWeights
-                        skinData += [(boneName, weight)]
-                        sumWeights += weight
-                    vertexNum = "%s.vtx[%i]" % (meshName, index)
-                    if LOG_SKIN_DETAILS:
-                        print "Skin v#: ", vertexNum, " skinData: ", skinData
-                    cmds.skinPercent("%s" % tuple(clusterName),
-                                     vertexNum, transformValue=skinData)
+                for boneName, weight in weightdata.items():
+                    # The weights in the mesh are rounded by Maya, and as a
+                    # result can occasionally overflow. We compensate for
+                    # this by arbitrarily removing weight from the last
+                    # joint. This doesn't change things appreciably since
+                    # we're subtracting out rounding error.
+                    if sumWeights + weight > 1.0:
+                        weight = 1.0 - sumWeights
+                    jidx = jointLookup[boneName]
+                    apiWeights[(index * numJoints) + jidx] = weight
+                vertexNum = "%s.vtx[%i]" % (meshName, index)
+                if LOG_SKIN_DETAILS:
+                    print "Skin v#: ", vertexNum, " skinData: ", skinData
 
-            # Now put all the singleton weights into the mesh.
-            for bone, vertices in singletons.items():
-                cmds.select("%s.vtx[%i]" % (meshName, vertices[0]))
-                for i in range(1, len(vertices)):
-                    cmds.select("%s.vtx[%i]" % (meshName, vertices[i]),
-                                add=True)
-                cmds.skinPercent("%s" % tuple(clusterName),
-                                 transformValue=[(bone, 1.0)])
+            apiComponents = (OpenMaya.MFnSingleIndexedComponent()
+                             .create(OpenMaya.MFn.kMeshVertComponent))
+            (OpenMaya.MFnSingleIndexedComponent(apiComponents)
+                .addElements(apiVertices))
 
-    if LOG_DEBUG_STATS:
-        print "total: ", total,
-        print " singletons: ", singleton,
-        print " singleton bones: ", len(singletons)
+            mfnSkin.setWeights(meshDag, apiComponents,
+                               apiJointIndices, apiWeights, False)
+
+            if LOG_TIMING_STATS:
+                print "skinning time: ", time.time() - start
+
     return rdata
 
 
@@ -319,6 +322,48 @@ def importMeshes(rootName, armature):
     meshes = [importMesh(rootName, armature, meshData)
               for meshData in data.meshes]
     return meshes
+
+
+def isValidMObject(obj):
+    if isinstance(obj, OpenMaya.MObject):
+        return not obj.isNull()
+    else:
+        return False
+
+
+def toMObject(nodeName):
+    """ Get the API MObject given the name of an existing node """
+    sel = OpenMaya.MSelectionList()
+    obj = OpenMaya.MObject()
+    result = None
+    try:
+        sel.add(nodeName)
+        obj = sel.getDependNode(0)
+        if isValidMObject(obj):
+            result = obj
+    except Exception as e:
+        print "toMObject failed: ", e
+    return result
+
+
+def toMDagPath(nodeName):
+    """ Get an API MDagPAth to the node given the name of existing dag node """
+    obj = toMObject(nodeName)
+    if obj:
+        dagFn = OpenMaya.MFnDagNode(obj)
+        # dagPath = OpenMaya.MDagPath()
+        return dagFn.getPath()
+
+
+def influenceObjects(skinCluster):
+    mfnSkin = OpenMayaAnim.MFnSkinCluster(toMObject(skinCluster))
+    # dagPaths = OpenMaya.MDagPathArray()
+    dagPaths = mfnSkin.influenceObjects()
+    influences = []
+    l = len(dagPaths)
+    for i in range(l):
+        influences.append(dagPaths[i].fullPathName())
+    return influences
 
 
 # def importEmpties():
@@ -471,5 +516,8 @@ def read(aux, inputsettings, materials=None, instanceCount=0):
 
     settings.filename = aux
 
+    start = time.time()
     status = readmdl(materials, instanceCount)
+    if LOG_TIMING_STATS:
+        print "loading time: ", time.time() - start
     return status
