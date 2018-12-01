@@ -20,10 +20,6 @@ data = None
 rootObject = None
 BoneNames = []
 
-# Extra UVs are used for texturing that we don't currently support.
-# Suppress loading them as they are time consuming for no point.
-IGNORE_EXTRA_UVS = True
-
 LOG_TIMING_STATS = True
 LOG_DEBUG_STATS = False
 LOG_SKIN_DETAILS = False
@@ -244,34 +240,35 @@ def importMesh(rootName, armature, meshData):
     uvStart = time.time()
 
     uvRange = meshData.uvCount
-    if IGNORE_EXTRA_UVS:
-        uvRange = 1
 
     for UVSet in range(uvRange):
         uvSetStart = time.time()
         if UVSet == 0:
+            # Rename the first UV set to match Maya's expectation
             uvSetNode = "map1"
         else:
             UVSetName = "UVSet_%s" % UVSet
-            # print "UVSetname: %s, UVSet: %s"%(UVSetName,UVSet)
             uvSetNode = mesh.createUVSet(UVSetName)
 
         mesh.setCurrentUVSetName(uvSetNode)
-        MeshUVIDs = OpenMaya.MIntArray()
-        MeshUVCounts = OpenMaya.MIntArray()
+        MeshUVIDs = OpenMaya.MIntArray(len(faces), 0)
+        MeshUVCounts = OpenMaya.MIntArray(len(faces) / 3, 3)
+        MeshUs = OpenMaya.MFloatArray(len(faces), 0)
+        MeshVs = OpenMaya.MFloatArray(len(faces), 0)
+
         for fidx in range(0, len(faces), 3):
-            MeshUVIDs.append(faces[fidx+0])
-            MeshUVIDs.append(faces[fidx+1])
-            MeshUVIDs.append(faces[fidx+2])
-            MeshUVCounts.append(3)
-            mesh.setUV(faces[fidx+0], uvs[faces[fidx+0]][UVSet][0],
-                       1-uvs[faces[fidx+0]][UVSet][1], uvSetNode)
-            mesh.setUV(faces[fidx+1], uvs[faces[fidx+1]][UVSet][0],
-                       1-uvs[faces[fidx+1]][UVSet][1], uvSetNode)
-            mesh.setUV(faces[fidx+2], uvs[faces[fidx+2]][UVSet][0],
-                       1-uvs[faces[fidx+2]][UVSet][1], uvSetNode)
+            MeshUVIDs[fidx+0] = faces[fidx+0]
+            MeshUVIDs[fidx+1] = faces[fidx+1]
+            MeshUVIDs[fidx+2] = faces[fidx+2]
+            MeshUs[faces[fidx+0]] = uvs[faces[fidx+0]][UVSet][0]
+            MeshVs[faces[fidx+0]] = 1-uvs[faces[fidx+0]][UVSet][1]
+            MeshUs[faces[fidx+1]] = uvs[faces[fidx+1]][UVSet][0]
+            MeshVs[faces[fidx+1]] = 1-uvs[faces[fidx+1]][UVSet][1]
+            MeshUs[faces[fidx+2]] = uvs[faces[fidx+2]][UVSet][0]
+            MeshVs[faces[fidx+2]] = 1-uvs[faces[fidx+2]][UVSet][1]
 
         if len(MeshUVCounts) > 0:
+            mesh.setUVs(MeshUs, MeshVs)
             mesh.assignUVs(MeshUVCounts, MeshUVIDs, uvSetNode)
 
         if LOG_TIMING_STATS:
@@ -291,7 +288,7 @@ def importMesh(rootName, armature, meshData):
                                            skinMethod=1)
             # Build the bone indices from the skin's view of bones
             # since that ordering is used by the OpenMaya calls.
-            mfnSkin = OpenMayaAnim.MFnSkinCluster(toMObject(clusterName[0]))
+            mfnSkin = OpenMayaAnim.MFnSkinCluster(get_mobject(clusterName[0]))
             meshDag = toMDagPath(meshName)
             influences = influenceObjects(clusterName[0])
             jointLookup = dict((y.split('|')[-1], x)
@@ -349,31 +346,9 @@ def importMeshes(rootName, armature):
     return meshes
 
 
-def isValidMObject(obj):
-    if isinstance(obj, OpenMaya.MObject):
-        return not obj.isNull()
-    else:
-        return False
-
-
-def toMObject(nodeName):
-    """ Get the API MObject given the name of an existing node """
-    sel = OpenMaya.MSelectionList()
-    obj = OpenMaya.MObject()
-    result = None
-    try:
-        sel.add(nodeName)
-        obj = sel.getDependNode(0)
-        if isValidMObject(obj):
-            result = obj
-    except Exception as e:
-        print "toMObject failed: ", e
-    return result
-
-
 def toMDagPath(nodeName):
     """ Get an API MDagPAth to the node given the name of existing dag node """
-    obj = toMObject(nodeName)
+    obj = get_mobject(nodeName)
     if obj:
         dagFn = OpenMaya.MFnDagNode(obj)
         # dagPath = OpenMaya.MDagPath()
@@ -381,7 +356,7 @@ def toMDagPath(nodeName):
 
 
 def influenceObjects(skinCluster):
-    mfnSkin = OpenMayaAnim.MFnSkinCluster(toMObject(skinCluster))
+    mfnSkin = OpenMayaAnim.MFnSkinCluster(get_mobject(skinCluster))
     # dagPaths = OpenMaya.MDagPathArray()
     dagPaths = mfnSkin.influenceObjects()
     influences = []
