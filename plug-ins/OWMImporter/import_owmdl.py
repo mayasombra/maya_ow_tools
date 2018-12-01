@@ -217,7 +217,6 @@ def importMesh(rootName, armature, meshData):
     mfName = "submesh%s_%s" % (rootName, meshData.name.rsplit("_")[-1])
     mfName = MayaSafeName(mfName)
     mfName = mfName.rsplit("_", 1)[0]
-    # print "name: %s"%mfName
     meshName = cmds.createNode("transform", n=mfName, p=rootObject)
     pos, norms, uvs, boneData = segregate(meshData.vertices)
     faces, fcounts = detach(meshData.indices)
@@ -228,47 +227,33 @@ def importMesh(rootName, armature, meshData):
     mesh = OpenMaya.MFnMesh()
     mesh.create(pos, fcounts, faces, parent=get_mobject(meshName))
     meshshapename = mesh.fullPathName().rsplit("|")[-1]
-    # print "extracted shapename: %s" % meshshapename
     cmds.rename(meshshapename, "%sShape" % mfName)
 
-    # Display a list of UV data
-    # for uvID in range(len(uvs)):
-    #    print "uvdata: %s"%uvs[uvID]
-
-    # Build UV Data
-    # print "UVCount: %s" % meshData.uvCount
     uvStart = time.time()
-
     uvRange = meshData.uvCount
+    MeshUVCounts = OpenMaya.MIntArray(len(faces) / 3, 3)
 
     for UVSet in range(uvRange):
         uvSetStart = time.time()
         if UVSet == 0:
-            # Rename the first UV set to match Maya's expectation
+            # Maya expects the default UV set to have this name.
             uvSetNode = "map1"
         else:
             UVSetName = "UVSet_%s" % UVSet
             uvSetNode = mesh.createUVSet(UVSetName)
 
-        mesh.setCurrentUVSetName(uvSetNode)
         MeshUVIDs = OpenMaya.MIntArray(len(faces), 0)
-        MeshUVCounts = OpenMaya.MIntArray(len(faces) / 3, 3)
         MeshUs = OpenMaya.MFloatArray(len(faces), 0)
         MeshVs = OpenMaya.MFloatArray(len(faces), 0)
 
         for fidx in range(0, len(faces), 3):
-            MeshUVIDs[fidx+0] = faces[fidx+0]
-            MeshUVIDs[fidx+1] = faces[fidx+1]
-            MeshUVIDs[fidx+2] = faces[fidx+2]
-            MeshUs[faces[fidx+0]] = uvs[faces[fidx+0]][UVSet][0]
-            MeshVs[faces[fidx+0]] = 1-uvs[faces[fidx+0]][UVSet][1]
-            MeshUs[faces[fidx+1]] = uvs[faces[fidx+1]][UVSet][0]
-            MeshVs[faces[fidx+1]] = 1-uvs[faces[fidx+1]][UVSet][1]
-            MeshUs[faces[fidx+2]] = uvs[faces[fidx+2]][UVSet][0]
-            MeshVs[faces[fidx+2]] = 1-uvs[faces[fidx+2]][UVSet][1]
+            for j in range(3):
+                MeshUVIDs[fidx+j] = faces[fidx+j]
+                MeshUs[faces[fidx+j]] = uvs[faces[fidx+j]][UVSet][0]
+                MeshVs[faces[fidx+j]] = 1-uvs[faces[fidx+j]][UVSet][1]
 
         if len(MeshUVCounts) > 0:
-            mesh.setUVs(MeshUs, MeshVs)
+            mesh.setUVs(MeshUs, MeshVs, uvSetNode)
             mesh.assignUVs(MeshUVCounts, MeshUVIDs, uvSetNode)
 
         if LOG_TIMING_STATS:
