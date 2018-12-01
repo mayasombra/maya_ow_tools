@@ -20,6 +20,10 @@ data = None
 rootObject = None
 BoneNames = []
 
+# Extra UVs are used for texturing that we don't currently support.
+# Suppress loading them as they are time consuming for no point.
+IGNORE_EXTRA_UVS = True
+
 LOG_TIMING_STATS = True
 LOG_DEBUG_STATS = False
 LOG_SKIN_DETAILS = False
@@ -66,6 +70,7 @@ def fixLength(bone):
 
 
 def importArmature(parentName):
+    start = time.time()
     bones = data.bones
     armature = None
     if len(bones) > 0:
@@ -100,6 +105,8 @@ def importArmature(parentName):
             if parent is not None:
                 cmds.connectJoint(bbone, parent, pm=True)
 
+    if LOG_TIMING_STATS:
+        print "importArmature(): ", time.time() - start
     return armature
 
 
@@ -160,6 +167,7 @@ def getBoneWeights(boneData):
 
 
 def bindMaterials(meshes, data, materials):
+    start = time.time()
     if materials is None:
         cmds.warning("No materials to bind!")
         return
@@ -199,12 +207,15 @@ def bindMaterials(meshes, data, materials):
             # print("else: Lambert")
             cmds.select("%sShape" % obj["name"], r=True)
             cmds.sets(forceElement="initialShadingGroup")
+    if LOG_TIMING_STATS:
+        print "bindMaterials(): ", time.time() - start
 
 
 def importMesh(rootName, armature, meshData):
     global settings
     global rootObject
 
+    start = time.time()
     rdata = {}
 
     mfName = "submesh%s_%s" % (rootName, meshData.name.rsplit("_")[-1])
@@ -230,8 +241,14 @@ def importMesh(rootName, armature, meshData):
 
     # Build UV Data
     # print "UVCount: %s" % meshData.uvCount
-    for UVSet in range(meshData.uvCount):
-        # if meshData.uvCount == 1:
+    uvStart = time.time()
+
+    uvRange = meshData.uvCount
+    if IGNORE_EXTRA_UVS:
+        uvRange = 1
+
+    for UVSet in range(uvRange):
+        uvSetStart = time.time()
         if UVSet == 0:
             uvSetNode = "map1"
         else:
@@ -257,9 +274,15 @@ def importMesh(rootName, armature, meshData):
         if len(MeshUVCounts) > 0:
             mesh.assignUVs(MeshUVCounts, MeshUVIDs, uvSetNode)
 
+        if LOG_TIMING_STATS:
+            print "UV Set ", UVSet, " #: ", len(MeshUVCounts),
+            print " time: ", time.time() - uvSetStart
+    if LOG_TIMING_STATS:
+        print "UV build time: ", time.time() - uvStart
+
     # Attach Bones
     if armature:
-        start = time.time()
+        skinStart = time.time()
         bwd = getBoneWeights(boneData)
         if len(bwd) > 0:
             cmds.select(rootObject, r=True)
@@ -312,8 +335,10 @@ def importMesh(rootName, armature, meshData):
                                apiJointIndices, apiWeights, False)
 
             if LOG_TIMING_STATS:
-                print "skinning time: ", time.time() - start
+                print "skinning time: ", time.time() - skinStart
 
+    if LOG_TIMING_STATS:
+        print "importMesh(): ", time.time() - start
     return rdata
 
 
@@ -433,9 +458,12 @@ def readmdl(materials=None, instanceCount=0):
     cmds.currentUnit(linear="inch", angle="deg")
     root, file = os.path.split(settings.filename)
 
+    readStart = time.time()
     data = read_owmdl.read(settings.filename)
     if not data:
         return None
+    if LOG_TIMING_STATS:
+        print "read time: ", time.time() - readStart
 
     rootName = os.path.splitext(file)[0]
     if len(data.header.name) > 0:
