@@ -235,11 +235,12 @@ def importMesh(rootName, armature, meshData):
 
     for UVSet in range(uvRange):
         uvSetStart = time.time()
+        # Per https://goo.gl/UtXRmc we name the UV sets to match the default
+        # names. This helps with handling the model later.
         if UVSet == 0:
-            # Maya expects the default UV set to have this name.
             uvSetNode = "map1"
         else:
-            UVSetName = "UVSet_%s" % UVSet
+            UVSetName = "uvSet"
             uvSetNode = mesh.createUVSet(UVSetName)
 
         MeshUVIDs = OpenMaya.MIntArray(len(faces), 0)
