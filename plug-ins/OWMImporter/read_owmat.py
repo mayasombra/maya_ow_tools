@@ -11,9 +11,13 @@ def openStream(filename):
     return stream
 
 
+LOG_MATERIAL_DETAILS = False
+
+
 def read(filename, sub=False):
     filename = os.path.normpath(filename.replace('\\', os.sep))
-    # print "read(%s) sub=%s" % (filename, sub)
+    if LOG_MATERIAL_DETAILS:
+        print "read(%s) sub=%s" % (filename, sub)
     stream = openStream(filename)
     if stream is None:
         return False
@@ -25,12 +29,14 @@ def read(filename, sub=False):
     if major >= 2 and minor >= 0:
         mat_type = bin_ops.readFmtFlat(
             stream, owm_types.OWMATHeader.new_format)
-        # print ("Major: ", major, " Minor: ", minor, " MC: ", materialCount,
-        #        " mat_type: ", mat_type, " sub: ", sub)
+        if LOG_MATERIAL_DETAILS:
+            print ("Major: ", major, " Minor: ", minor, " MC: ", materialCount,
+                   " mat_type: ", mat_type, " sub: ", sub)
         if mat_type == 0:
             shader, id_count = bin_ops.readFmtFlat(
                 stream, owm_types.OWMATHeader.new_material_header_format)
-            # print "shader: %x id_count: %d" % (shader, id_count)
+            if LOG_MATERIAL_DETAILS:
+                print "shader: %x id_count: %d" % (shader, id_count)
             ids = []
             for i in range(id_count):
                 ids.append(bin_ops.readFmtFlat(
@@ -39,7 +45,8 @@ def read(filename, sub=False):
             for i in range(materialCount):
                 texture, texture_type = bin_ops.readFmtFlat(
                     stream, owm_types.OWMATMaterial.new_material_format)
-                # print "texture %s texture_type: %d" % (texture, texture_type)
+                if LOG_MATERIAL_DETAILS:
+                    print "texture %s tex_type: %d" % (texture, texture_type)
                 textures += [(texture, 0, texture_type)]
             if sub:
                 return textures, shader, ids
@@ -57,7 +64,8 @@ def read(filename, sub=False):
                     stream, owm_types.OWMATMaterial.new_modellook_format)
                 textures, shader, ids = read(os.path.join(filename,
                                              material_file), True)
-                # print "ids: ", ["%X" % id for id in ids]
+                if LOG_MATERIAL_DETAILS:
+                    print "ids: ", ["%X" % id for id in ids]
                 for mat_id in ids:
                     materials += [owm_types.OWMATMaterial(
                         mat_id, len(textures), textures, shader)]
