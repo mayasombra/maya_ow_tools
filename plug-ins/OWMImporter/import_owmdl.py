@@ -509,4 +509,5 @@ def read(aux, inputsettings, materials=None, instanceCount=0):
     status = readmdl(materials, instanceCount)
     if LOG_TIMING_STATS:
         print "loading time: ", time.time() - start
+    cmds.select(d=True)
     return status
