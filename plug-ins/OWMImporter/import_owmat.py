@@ -2,7 +2,6 @@ import os
 import maya.cmds as cmds
 
 from OWMImporter import read_owmat
-from OWMImporter import gfx
 
 textureList = {}
 TexErrors = {}
@@ -46,11 +45,16 @@ def buildStingray(root, mname, material):
     shadinggroup = cmds.sets(renderable=True, empty=True, noSurfaceShader=True,
                              name="%sSG" % shader)
     cmds.shaderfx(sfxnode=shader, initShaderAttributes=True)
+
+    shader_dir = os.path.dirname(os.path.realpath(__file__))
+    shader_file = os.path.join(shader_dir, 'ow_shader.sfx')
+
+    cmds.shaderfx(sfxnode=shader, loadGraph=shader_file)
     cmds.connectAttr('%s.outColor' % shader, '%s.surfaceShader' % shadinggroup,
                      force=True)
 
-    cmds.setAttr("%s.metallic" % shader, 0)
-    cmds.setAttr("%s.roughness" % shader, 1)
+    # cmds.setAttr("%s.metallic" % shader, 0)
+    # cmds.setAttr("%s.roughness" % shader, 1)
 
     for texturetype in material.textures:
         typ = texturetype[2]
@@ -79,24 +83,10 @@ def buildStingray(root, mname, material):
 
             elif typ == 548341454 or typ == 3111105361:
                 print "binding metallics ", typ, " on material ", mname
-                cmds.setAttr("%s.use_metallic_map" % shader, 1)
-                cmds.setAttr("%s.use_roughness_map" % shader, 1)
+                file_node = make_texture_node(texture, root)
 
-                pbr = texture_path(texture, root)
-                rough_path = pbr.replace('.tif', '-rough.tif')
-                if not os.path.isfile(rough_path):
-                    gfx.transform(pbr, gfx.roughness, rough_path)
-                rough = bind_node(rough_path)
-                metal_path = pbr.replace('.tif', '-metal.tif')
-                if not os.path.isfile(metal_path):
-                    gfx.transform(pbr, gfx.metal, metal_path)
-                metal = bind_node(metal_path)
-
-                cmds.connectAttr('%s.outColor' % rough,
-                                 '%s.TEX_roughness_map' % shader)
-
-                cmds.connectAttr('%s.outColor' % metal,
-                                 '%s.TEX_metallic_map' % shader)
+                cmds.connectAttr('%s.outColor' % file_node,
+                                 '%s.TEX_PBR_map' % shader)
 
                 # This is completely wrong for specular. Not sure what
                 # to do for Stingray.
@@ -108,7 +98,6 @@ def buildStingray(root, mname, material):
                 print "binding emissive ", typ, " on material ", mname
                 file_node = make_texture_node(texture, root)
                 cmds.setAttr("%s.use_emissive_map" % shader, 1)
-                cmds.setAttr("%s.emissive_intensity" % shader, 0.3)
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_emissive_map' % shader)
             elif typ == 3761386704:
@@ -119,6 +108,12 @@ def buildStingray(root, mname, material):
                 cmds.setAttr("%s.use_ao_map" % shader, 1)
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_ao_map' % shader)
+            elif typ == 1140682086:
+                print "binding mask", typ, " on material ", mname
+                file_node = make_texture_node(texture, root)
+                cmds.setAttr("%s.use_mask_map" % shader, 1)
+                cmds.connectAttr('%s.outColor' % file_node,
+                                 '%s.TEX_mask_map' % shader)
             else:
                 print ("import_owmat: ignoring unknown "
                        "texture type ", typ, " on material ", mname,
