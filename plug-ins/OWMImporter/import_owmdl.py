@@ -20,7 +20,7 @@ data = None
 rootObject = None
 BoneNames = []
 
-LOG_TIMING_STATS = True
+LOG_TIMING_STATS = False
 LOG_DEBUG_STATS = False
 LOG_SKIN_DETAILS = False
 
@@ -305,6 +305,7 @@ def importMesh(rootName, armature, meshData):
                         weight = 1.0 - sumWeights
                     jidx = jointLookup[boneName]
                     apiWeights[(index * numJoints) + jidx] = weight
+                    sumWeights += weight
                 vertexNum = "%s.vtx[%i]" % (meshName, index)
                 if LOG_SKIN_DETAILS:
                     print "Skin v#: ", vertexNum, " skinData: ", skinData
