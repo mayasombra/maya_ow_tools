@@ -10,7 +10,7 @@ def openStream(filename):
     return stream
 
 
-def read(filename):
+def read(filename, headerOnly=False):
     stream = openStream(filename)
     if stream is None:
         return False
@@ -22,6 +22,8 @@ def read(filename):
     header = owm_types.OWMDLHeader(major, minor, materialstr, namestr,
                                    boneCount, meshCount, emptyCount)
 
+    if headerOnly:
+        return header
     bones = []
     if boneCount > 0:
         for i in range(boneCount):
@@ -86,6 +88,7 @@ def read(filename):
             for i in range(emptyCount):
                 empties[i].hardpoint = bin_ops.readFmt(
                     stream, owm_types.OWMDLEmpty.exFormat)
+        # print "empty ", i, ": ", empties[i].name, empties[i].hardpoint
 
     cloths = []
     if minor >= 3 and major >= 1:
