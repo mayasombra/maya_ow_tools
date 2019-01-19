@@ -35,7 +35,8 @@ def buildCollision(mname):
 # build a Overwatch-specific shader network...
 def buildStingray(root, mname, material):
     global textureList
-    # print "Building Stingray shader..."
+    print "Building Stingray shader for material:", mname,
+    print " with OW shader type:", material.shader
 
     # Build initial network
     shader = cmds.shadingNode('StingrayPBS',
@@ -47,44 +48,39 @@ def buildStingray(root, mname, material):
     cmds.shaderfx(sfxnode=shader, initShaderAttributes=True)
 
     shader_dir = os.path.dirname(os.path.realpath(__file__))
-    shader_file = os.path.join(shader_dir, 'ow_shader.sfx')
+    shader_file = os.path.join(
+        shader_dir, ('ow_shader_%d.sfx' % material.shader))
 
     cmds.shaderfx(sfxnode=shader, loadGraph=shader_file)
     cmds.connectAttr('%s.outColor' % shader, '%s.surfaceShader' % shadinggroup,
                      force=True)
 
-    # cmds.setAttr("%s.metallic" % shader, 0)
-    # cmds.setAttr("%s.roughness" % shader, 1)
-
     for texturetype in material.textures:
         typ = texturetype[2]
         texture = texturetype[0]
         print "texture identifier: ", texture
+        file_node = make_texture_node(texture, root)
 
         try:
             if typ == 2903569922 or typ == 1716930793 or typ == 1239794147:
                 print "binding color", typ, " on material ", mname
-                file_node = make_texture_node(texture, root)
                 cmds.setAttr("%s.use_color_map" % shader, 1)
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_color_map' % shader)
-            elif typ == 378934698 or typ == 562391268:
-                print "binding normal", typ, " on material ", mname
-                file_node = make_texture_node(texture, root)
-                cmds.setAttr("%s.use_normal_map" % shader, 1)
-                cmds.connectAttr('%s.outColor' % file_node,
-                                 '%s.TEX_normal_map' % shader)
 
                 # This map also provides the emissive color
                 # emissive is only enabled if there is an emissive
                 # texture, so this linkage is safe.
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.emissive' % shader)
+            elif typ == 378934698 or typ == 562391268:
+                print "binding normal", typ, " on material ", mname
+                cmds.setAttr("%s.use_normal_map" % shader, 1)
+                cmds.connectAttr('%s.outColor' % file_node,
+                                 '%s.TEX_normal_map' % shader)
 
             elif typ == 548341454 or typ == 3111105361:
-                print "binding metallics ", typ, " on material ", mname
-                file_node = make_texture_node(texture, root)
-
+                print "binding PBR ", typ, " on material ", mname
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_PBR_map' % shader)
 
@@ -96,7 +92,6 @@ def buildStingray(root, mname, material):
 
             elif typ == 3166598269:
                 print "binding emissive ", typ, " on material ", mname
-                file_node = make_texture_node(texture, root)
                 cmds.setAttr("%s.use_emissive_map" % shader, 1)
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_emissive_map' % shader)
@@ -104,16 +99,26 @@ def buildStingray(root, mname, material):
                 print "binding AO ", typ, " on material ", mname
                 # Need to figure this out. The AO map is a strength bit,
                 # not sure what Maya is expecting.
-                file_node = make_texture_node(texture, root)
                 cmds.setAttr("%s.use_ao_map" % shader, 1)
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_ao_map' % shader)
-            elif typ == 1140682086:
+            elif typ == 1140682086 or typ == 1482859648:
                 print "binding mask", typ, " on material ", mname
-                file_node = make_texture_node(texture, root)
                 cmds.setAttr("%s.use_mask_map" % shader, 1)
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_mask_map' % shader)
+            elif typ == 1557393490:
+                print ("material mask ", typ,
+                       " not yet implemented on material ", mname)
+            elif typ == 3004687613:
+                print ("subsurface scattering ", typ,
+                       " not yet implemented on material ", mname)
+            elif typ == 2337956496:
+                print ("anisotropy tangent ", typ,
+                       " not yet implemented on material ", mname)
+            elif typ == 1117188170:
+                print ("specular ", typ,
+                       " not yet implemented on material ", mname)
             else:
                 print ("import_owmat: ignoring unknown "
                        "texture type ", typ, " on material ", mname,

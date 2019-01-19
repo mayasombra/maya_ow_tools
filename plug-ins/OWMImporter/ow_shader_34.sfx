@@ -4,7 +4,7 @@ GroupVersion=-1.000000
 Advanced=0
 HelpID=0
 ParentMaterial=0
-NumberOfNodes=34
+NumberOfNodes=37
 #NT=20178 0
 	PC=2
 	posx=1 v=2003 -320.000000
@@ -288,7 +288,7 @@ NumberOfNodes=34
 		SVT=5022 3001 2 0 0 
 	OSC=1
 		SVT=5022 3001 3 
-		CC=6
+		CC=7
 			C=18 0 3 15 0 1 0
 			CPC=0
 			C=18 0 3 27 0 1 0
@@ -300,6 +300,8 @@ NumberOfNodes=34
 			C=18 0 3 30 0 1 0
 			CPC=0
 			C=18 0 3 32 0 1 0
+			CPC=0
+			C=18 0 3 35 0 1 0
 			CPC=0
 #NT=20185 0
 	PC=7
@@ -531,6 +533,54 @@ NumberOfNodes=34
 		CC=1
 			C=33 0 5 6 2 3 0
 			CPC=0
+#NT=20185 0
+	PC=6
+	name=1 v=5000 use_ao_map
+	posx=1 v=2003 604.286011
+	posy=1 v=2003 1262.858154
+	type=2 e=0 v=5012 0
+	uitype=2 e=0 v=5012 1
+	uiorder=2 e=0 v=2002 13
+	group=-1
+	ISC=0
+	OSC=1
+		SVT=5022 2003 1 
+		CC=1
+			C=34 0 1 36 0 1 0
+			CPC=0
+#NT=20177 0
+	PC=3
+	name=1 v=5000 ao_map
+	posx=1 v=2003 442.857117
+	posy=1 v=2003 1115.713623
+	group=-1
+	ISC=2
+		SVT=5022 3001 1 0 0 
+		SVT=5022 2003 2 0 0 
+	OSC=1
+		SVT=5022 3003 3 
+		CC=1
+			C=35 0 3 36 2 3 0
+			CPC=0
+#NT=20189 0
+	PC=3
+	name=1 v=5000 ao_map_switch
+	posx=1 v=2003 1027.142456
+	posy=1 v=2003 1209.999512
+	group=-1
+	ISC=4
+		SVT=5022 2003 1 0 0 
+		SVT=5022 2003 2 1 0 
+		SDV=1.000000
+		SVT=5022 2003 3 0 1 
+		SCS=r
+		SVT=5022 2003 4 1 0 
+		SDV=1.000000
+	OSC=1
+		SVT=5022 2003 5 
+		CC=1
+			C=36 0 5 6 8 9 0
+			CPC=0
 
  */ } 
 connections = [
@@ -604,6 +654,15 @@ connections = [
 		destination = { 
 			connector_id = "1ee9af1f-65f2-4739-ad28-5ea6a0e68fc3" 
 			instance_id = "abbaabba-abba-abba-abba-abbaabbaab33" 
+		} 
+		source = { 
+			instance_id = "abbaabba-abba-abba-abba-abbaabbaab19" 
+		} 
+	} 
+	{ 
+		destination = { 
+			connector_id = "1ee9af1f-65f2-4739-ad28-5ea6a0e68fc3" 
+			instance_id = "abbaabba-abba-abba-abba-abbaabbaab36" 
 		} 
 		source = { 
 			instance_id = "abbaabba-abba-abba-abba-abbaabbaab19" 
@@ -849,6 +908,36 @@ connections = [
 			instance_id = "abbaabba-abba-abba-abba-abbaabbaab26" 
 		} 
 	} 
+	{ 
+		destination = { 
+			connector_id = "59fd1cf4-f736-470d-8510-1dd7c016639e" 
+			instance_id = "abbaabba-abba-abba-abba-abbaabbaabb7" 
+		} 
+		source = { 
+			instance_id = "abbaabba-abba-abba-abba-abbaabbaab37" 
+		} 
+	} 
+	{ 
+		destination = { 
+			connector_id = "CED7BBF3-0B48-4335-B933-095A41CA0294" 
+			instance_id = "abbaabba-abba-abba-abba-abbaabbaab37" 
+		} 
+		source = { 
+			instance_id = "abbaabba-abba-abba-abba-abbaabbaab35" 
+		} 
+	} 
+	{ 
+		destination = { 
+			connector_id = "4CBB4480-79E8-4CE7-AC0F-8B09BAF12390" 
+			instance_id = "abbaabba-abba-abba-abba-abbaabbaab37" 
+		} 
+		select = [ 
+			"r" 
+			] 
+		source = { 
+			instance_id = "abbaabba-abba-abba-abba-abbaabbaab36" 
+		} 
+	} 
 ]
 constants = [
 	{ 
@@ -929,6 +1018,22 @@ constants = [
 		instance_id = "abbaabba-abba-abba-abba-abbaabbaab26" 
 		value = [ 
 			0.300000
+		] 
+	} 
+	{ 
+		connector_id = "39BC7619-2768-480B-ACFD-63FA66EF6905" 
+		id = "1bbaabba-abba-abba-abba-abbaabbaab37" 
+		instance_id = "abbaabba-abba-abba-abba-abbaabbaab37" 
+		value = [ 
+			1.000000
+		] 
+	} 
+	{ 
+		connector_id = "F2F74E58-402D-472B-87DD-331E00DB416C" 
+		id = "3bbaabba-abba-abba-abba-abbaabbaab37" 
+		instance_id = "abbaabba-abba-abba-abba-abbaabbaab37" 
+		value = [ 
+			1.000000
 		] 
 	} 
 ]
@@ -1641,6 +1746,87 @@ nodes = [
 		} 
 		title = "Emissive Intensity" 
 		type = "core/shader_nodes/constant_scalar" 
+	} 
+	{ 
+		content_size = [ 
+			160 
+			0 
+		] 
+		export = { 
+		} 
+		id = "abbaabba-abba-abba-abba-abbaabbaab37" 
+		options = [ 
+			"9A84282B-F1A2-46D4-9FC4-5A76FC9B30DD"
+		] 
+		position = [ 
+			1027 
+			1209 
+		] 
+		samplers = { 
+		} 
+		title = "Ao Map Switch" 
+		type = "core/shader_nodes/if" 
+	} 
+	{ 
+		content_size = [ 
+			160 
+			0 
+		] 
+		export = { 
+			material_variable = { 
+				display_name = "Use Ao Map" 
+				name = "use_ao_map" 
+				ui = { 
+					max = 1 
+					min = 0.000000 
+					step = 1 
+					order = 13 
+					ui_type = "checkbox" 
+				} 
+				type = "float" 
+				value = 0.000000 
+			} 
+		} 
+		id = "abbaabba-abba-abba-abba-abbaabbaab35" 
+		options = [ 
+		] 
+		position = [ 
+			604 
+			1262 
+		] 
+		samplers = { 
+		} 
+		title = "Use Ao Map" 
+		type = "core/shader_nodes/material_variable" 
+	} 
+	{ 
+		content_size = [ 
+			160 
+			0 
+		] 
+		export = { 
+		} 
+		id = "abbaabba-abba-abba-abba-abbaabbaab36" 
+		options = [ 
+			"1e067464-12d8-4826-9b72-cfd5765003e3"
+			"fb3f709b-a54a-4e93-ac9f-e9fc76fb8bcd"
+			"5dd59b3d-1762-4a14-9930-7500230ef3db"
+		] 
+		position = [ 
+			442 
+			1115 
+		] 
+		samplers = { 
+			texture_map = { 
+				display_name = "Ao Map" 
+				slot_name = "ao_map" 
+				ui = { 
+					order = 100 
+				} 
+			} 
+		} 
+		title = "Ao Map" 
+		type = "core/shader_nodes/sample_texture" 
 	} 
 ]
 version = 3
