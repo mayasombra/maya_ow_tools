@@ -86,7 +86,8 @@ def options_menu():
     global pluginSettings
     window = cmds.window(t='Overwatch Model Import Configuration')
     cmds.columnLayout(adj=True)
-    cmds.text(l='TODO: none of these options except Model Renderer actually do anything yet')
+    cmds.text(l='TODO: none of these options except Model Renderer '
+              'actually do anything yet')
     cmds.frameLayout(cll=True, label='Global Options')
     cmds.columnLayout()
     cmds.checkBox(l='Import Textures',
