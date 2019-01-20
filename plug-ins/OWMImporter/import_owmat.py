@@ -1,7 +1,7 @@
 import os
 import maya.cmds as cmds
 
-from OWMImporter import read_owmat
+from OWMImporter import read_owmat, redshift, options
 
 textureList = {}
 TexErrors = {}
@@ -189,6 +189,9 @@ def read(filename, prefix=''):
         if cmds.objExists(mname):
             shader = mname
         else:
-            shader = buildStingray(root, mname, material)
+            if options.get_setting('renderer') == 'Redshift':
+                shader = redshift.buildRedshift(root, mname, material, textureList)
+            else:  # Stingray
+                shader = buildStingray(root, mname, material)
             m[material.key] = shader
     return m, textureList

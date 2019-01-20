@@ -1,10 +1,10 @@
 import ast
 import maya.cmds as cmds
 
-renderers = ['Stingray', 'Arnold', 'Redshift']
+renderers = ['Stingray', 'Redshift']
 
 defaultPluginSettings = {
-    'renderer': 'Arnold',
+    'renderer': 'Stingray',
     'hide_reference_models': 'True',
     'import_textures': 'True',
 }
