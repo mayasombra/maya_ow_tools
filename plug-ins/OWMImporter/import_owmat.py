@@ -3,9 +3,6 @@ import maya.cmds as cmds
 
 from OWMImporter import read_owmat, redshift, options
 
-textureList = {}
-TexErrors = {}
-
 
 def buildCollision(mname):
     # Build initial network
@@ -33,8 +30,7 @@ def buildCollision(mname):
 
 # The Stingray node is our ideal material (for now) At some point, I might
 # build a Overwatch-specific shader network...
-def buildStingray(root, mname, material):
-    global textureList
+def buildStingray(root, mname, material, textureList):
     print "Building Stingray shader for material:", mname,
     print " with OW shader type:", material.shader
 
@@ -59,7 +55,7 @@ def buildStingray(root, mname, material):
         typ = texturetype[2]
         texture = texturetype[0]
         print "texture identifier: ", texture
-        file_node = make_texture_node(texture, root)
+        file_node = make_texture_node(texture, root, textureList)
 
         try:
             if typ == 2903569922 or typ == 1716930793 or typ == 1239794147:
@@ -140,13 +136,12 @@ def texture_path(texture, root):
     return realpath
 
 
-def make_texture_node(texture, root):
+def make_texture_node(texture, root, textureList):
     realpath = texture_path(texture, root)
-    return bind_node(realpath)
+    return bind_node(realpath, textureList)
 
 
-def bind_node(realpath):
-    global textureList
+def bind_node(realpath, textureList):
     fn, fext = os.path.splitext(realpath)
     fpath, name = os.path.split(fn)
     finame = ("img_%s" % name)
@@ -172,7 +167,6 @@ def bind_node(realpath):
 
 
 def read(filename, prefix=''):
-    global textureList
     textureList = {}
     # Normalize the filename for OS-independent separators
     filename = filename.replace('\\', os.sep)
@@ -190,8 +184,9 @@ def read(filename, prefix=''):
             shader = mname
         else:
             if options.get_setting('renderer') == 'Redshift':
-                shader = redshift.buildRedshift(root, mname, material, textureList)
+                shader = redshift.buildRedshift(
+                    root, mname, material, textureList)
             else:  # Stingray
-                shader = buildStingray(root, mname, material)
+                shader = buildStingray(root, mname, material, textureList)
             m[material.key] = shader
     return m, textureList
