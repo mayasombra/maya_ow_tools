@@ -81,8 +81,6 @@ def bind_node(realpath, textureList):
             textureList[fn] = file_node
             cmds.setAttr(("%s.fileTextureName" % file_node),
                          realpath, type="string")
-            cmds.setAttr(("%s.colorSpace" % file_node),
-                         "Raw", type="string")
         else:
             file_node = finame
     return file_node, name

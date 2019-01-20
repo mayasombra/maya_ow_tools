@@ -39,11 +39,15 @@ def buildShader(material, mname, texture_nodes):
                 cmds.setAttr("%s.use_normal_map" % shader, 1)
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_normal_map' % shader)
+                cmds.setAttr("%s.colorSpace" % file_node, "Raw",
+                             typ="string")
 
             elif typ == 548341454 or typ == 3111105361:
                 print "binding PBR ", typ, " on material ", mname
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_PBR_map' % shader)
+                cmds.setAttr("%s.colorSpace" % file_node, "Raw",
+                             typ="string")
 
                 # This is completely wrong for specular. Not sure what
                 # to do for Stingray.
