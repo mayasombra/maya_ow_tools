@@ -1,7 +1,7 @@
 import os
 import maya.cmds as cmds
 
-from OWMImporter import read_owmat, redshift, options
+from OWMImporter import read_owmat, redshift, options, stingray
 
 
 def buildCollision(mname):
@@ -28,104 +28,25 @@ def buildCollision(mname):
     return shadinggroup
 
 
-# The Stingray node is our ideal material (for now) At some point, I might
-# build a Overwatch-specific shader network...
-def buildStingray(root, mname, material, textureList):
+def buildShader(root, mname, material, textureList):
     print "Building Stingray shader for material:", mname,
     print " with OW shader type:", material.shader
 
-    # Build initial network
-    shader = cmds.shadingNode('StingrayPBS',
-                              asShader=True,
-                              name=mname)
-    # print "Built shader: ", shader
-    shadinggroup = cmds.sets(renderable=True, empty=True, noSurfaceShader=True,
-                             name="%sSG" % shader)
-    cmds.shaderfx(sfxnode=shader, initShaderAttributes=True)
-
-    shader_dir = os.path.dirname(os.path.realpath(__file__))
-    shader_file = os.path.join(
-        shader_dir, ('ow_shader_%d.sfx' % material.shader))
-
-    cmds.shaderfx(sfxnode=shader, loadGraph=shader_file)
-    cmds.connectAttr('%s.outColor' % shader, '%s.surfaceShader' % shadinggroup,
-                     force=True)
-
+    # Load textures
+    texture_nodes = {}
     for texturetype in material.textures:
         typ = texturetype[2]
         texture = texturetype[0]
         print "texture identifier: ", texture
-        file_node = make_texture_node(texture, root, textureList)
+        file_node, name, realpath = make_texture_node(
+            texture, root, textureList)
+        texture_nodes[typ] = (file_node, name, realpath)
 
-        try:
-            if typ == 2903569922 or typ == 1716930793 or typ == 1239794147:
-                print "binding color", typ, " on material ", mname
-                cmds.setAttr("%s.use_color_map" % shader, 1)
-                cmds.connectAttr('%s.outColor' % file_node,
-                                 '%s.TEX_color_map' % shader)
+    if options.get_setting('renderer') == 'Redshift':
+        return redshift.buildRedshift(material, mname, texture_nodes)
 
-                # This map also provides the emissive color
-                # emissive is only enabled if there is an emissive
-                # texture, so this linkage is safe.
-                cmds.connectAttr('%s.outColor' % file_node,
-                                 '%s.emissive' % shader)
-            elif typ == 378934698 or typ == 562391268:
-                print "binding normal", typ, " on material ", mname
-                cmds.setAttr("%s.use_normal_map" % shader, 1)
-                cmds.connectAttr('%s.outColor' % file_node,
-                                 '%s.TEX_normal_map' % shader)
-
-            elif typ == 548341454 or typ == 3111105361:
-                print "binding PBR ", typ, " on material ", mname
-                cmds.connectAttr('%s.outColor' % file_node,
-                                 '%s.TEX_PBR_map' % shader)
-
-                # This is completely wrong for specular. Not sure what
-                # to do for Stingray.
-                # cmds.connectAttr('%s.outColor' % specular,
-                #                  '%s.TEX_global_specular_cube' % shader,
-                #                  force=True)
-
-            elif typ == 3166598269:
-                print "binding emissive ", typ, " on material ", mname
-                cmds.setAttr("%s.use_emissive_map" % shader, 1)
-                cmds.connectAttr('%s.outColor' % file_node,
-                                 '%s.TEX_emissive_map' % shader)
-            elif typ == 3761386704:
-                print "binding AO ", typ, " on material ", mname
-                # Need to figure this out. The AO map is a strength bit,
-                # not sure what Maya is expecting.
-                cmds.setAttr("%s.use_ao_map" % shader, 1)
-                cmds.connectAttr('%s.outColor' % file_node,
-                                 '%s.TEX_ao_map' % shader)
-            elif typ == 1140682086 or typ == 1482859648:
-                print "binding mask", typ, " on material ", mname
-                cmds.setAttr("%s.use_mask_map" % shader, 1)
-                cmds.connectAttr('%s.outColor' % file_node,
-                                 '%s.TEX_mask_map' % shader)
-            elif typ == 1557393490:
-                print ("material mask ", typ,
-                       " not yet implemented on material ", mname)
-            elif typ == 3004687613:
-                print ("subsurface scattering ", typ,
-                       " not yet implemented on material ", mname)
-            elif typ == 2337956496:
-                print ("anisotropy tangent ", typ,
-                       " not yet implemented on material ", mname)
-            elif typ == 1117188170:
-                print ("specular ", typ,
-                       " not yet implemented on material ", mname)
-            else:
-                print ("import_owmat: ignoring unknown "
-                       "texture type ", typ, " on material ", mname,
-                       " from ", texture_path(texture, root))
-
-        except Exception as e:
-            print "Exception while materialing: %s" % e
-
-    # Return the name of the finished shader
-    # print "Assigned materials to shader: ", shader
-    return shadinggroup
+    # Stingray by default
+    return stingray.buildShader(material, mname, texture_nodes)
 
 
 def texture_path(texture, root):
@@ -138,7 +59,8 @@ def texture_path(texture, root):
 
 def make_texture_node(texture, root, textureList):
     realpath = texture_path(texture, root)
-    return bind_node(realpath, textureList)
+    file_node, name = bind_node(realpath, textureList)
+    return file_node, name, realpath
 
 
 def bind_node(realpath, textureList):
@@ -163,7 +85,7 @@ def bind_node(realpath, textureList):
                          "Raw", type="string")
         else:
             file_node = finame
-    return file_node
+    return file_node, name
 
 
 def read(filename, prefix=''):
@@ -183,10 +105,6 @@ def read(filename, prefix=''):
         if cmds.objExists(mname):
             shader = mname
         else:
-            if options.get_setting('renderer') == 'Redshift':
-                shader = redshift.buildRedshift(
-                    root, mname, material, textureList)
-            else:  # Stingray
-                shader = buildStingray(root, mname, material, textureList)
+            shader = buildShader(root, mname, material, textureList)
             m[material.key] = shader
     return m, textureList
