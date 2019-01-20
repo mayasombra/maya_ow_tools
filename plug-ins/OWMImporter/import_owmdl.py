@@ -194,7 +194,7 @@ def bindMaterials(meshes, data, materials):
             imgList = cmds.ls(type='file')
             for img in imgList:
                 try:
-                    UVSetName = "%sShape.uvSet[1].uvSetName" % obj["name"]
+                    UVSetName = "%sShape.uvSet[0].uvSetName" % obj["name"]
                     # print ("UVSet: %s, Img: %s"%(UVSetName,img))
                     cmds.uvLink(make=True, uvSet=UVSetName, texture=img)
                 except:
