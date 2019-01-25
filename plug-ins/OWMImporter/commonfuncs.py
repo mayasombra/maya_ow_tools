@@ -44,5 +44,8 @@ def wadjustAxis(vector):
 def MayaSafeName(input):
     output = re.sub(u"\u00F6", 'o', input)
     output = re.sub('[\']', '', output)
+    output = re.sub('[\'()]', '', output)
     output = re.sub('[. ]', '_', output)
+    output = re.sub('_+', '_', output)
+    output = re.sub('_$', '', output)
     return output
