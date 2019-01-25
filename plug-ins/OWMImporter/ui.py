@@ -3,7 +3,7 @@ import os.path
 import maya.cmds as cmds
 import maya.mel as mel
 
-from OWMImporter import import_owmdl
+from OWMImporter import import_owmdl, import_owmap
 
 renderers = ['Stingray', 'Arnold', 'Redshift']
 
@@ -64,7 +64,15 @@ def create_menu(hook):
                       command=lambda x: import_owmodel())
 
         cmds.setParent(menu, menu=True)
-        # cmds.menuItem(divider=True)
+
+        cmds.menuItem(label="Map", subMenu=True)
+        cmds.menuItem(label="Import OWMAP File",
+                      annotation="Imports an OW Map File",
+                      command=lambda x: import_owmapp())
+
+        cmds.setParent(menu, menu=True)
+
+        cmds.menuItem(divider=True)
 
         cmds.setParent(menu, menu=True)
         cmds.menuItem(label="Options",
@@ -124,6 +132,13 @@ def options_menu():
     cmds.setParent('..')
 
     cmds.showWindow()
+
+
+def import_owmapp():
+    import_file = importfile_dialog(
+        "OWMAP Files (*.owmap)", "Import OWMAP")
+    if import_file:
+        import_owmap.read(import_file, None)
 
 
 def import_owmodel():
