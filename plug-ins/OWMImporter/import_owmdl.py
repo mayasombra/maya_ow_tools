@@ -417,7 +417,7 @@ def readmdl(materials=None, instanceCount=0):
 
     currentlinear = cmds.currentUnit(query=True, linear=True)
     currentangle = cmds.currentUnit(query=True, angle=True)
-    cmds.currentUnit(linear="inch", angle="deg")
+    cmds.currentUnit(linear="cm", angle="deg")
     root, file = os.path.split(settings.filename)
 
     readStart = time.time()
