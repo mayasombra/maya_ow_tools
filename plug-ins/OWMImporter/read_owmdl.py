@@ -21,6 +21,10 @@ def read(filename, headerOnly=False):
         stream, owm_types.OWMDLHeader.structFormat)
     header = owm_types.OWMDLHeader(major, minor, materialstr, namestr,
                                    boneCount, meshCount, emptyCount)
+    print "major: ", major,
+    print "minor: ", minor,
+    print "meshCount: ", meshCount,
+    print "emptyCount: ", emptyCount
 
     if headerOnly:
         return header
@@ -90,8 +94,10 @@ def read(filename, headerOnly=False):
                     stream, owm_types.OWMDLEmpty.exFormat)
         # print "empty ", i, ": ", empties[i].name, empties[i].hardpoint
 
+    # These remaining fields aren't populated if there are no meshes,
+    # so check for that before reading the data.
     cloths = []
-    if minor >= 3 and major >= 1:
+    if minor >= 3 and major >= 1 and meshCount > 0:
         count = bin_ops.readFmt(stream, owm_types.OWMDLCloth.beforeFmt)[0]
         for i in range(count):
             name, meshCount = bin_ops.readFmtFlat(
@@ -120,7 +126,8 @@ def read(filename, headerOnly=False):
                 name, parent[0], pos, scale, rot)]
 
     guid = 0
-    if minor >= 5 and major >= 1:
+    if minor >= 5 and major >= 1 and meshCount > 0:
+        print "attempting to read guid"
         guid = bin_ops.readFmtFlat(stream, owm_types.OWMDLHeader.guidFormat)
 
     return owm_types.OWMDLFile(

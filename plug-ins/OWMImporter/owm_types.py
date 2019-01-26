@@ -146,24 +146,28 @@ class OWMDLEmpty:
 
 class OWMAPFile:
 
-    def __init__(self, header, objects, details, lights=[]):
+    def __init__(self, header, objects, details, lights=[], sounds=[]):
         self.header = header
         self.objects = objects
         self.details = details
         self.lights = lights
+        self.sounds = sounds
 
 
 class OWMAPHeader:
-    structFormat = ['<HH', str, '<III']
+    structFormat = ['<HH', str, '<II']
+    structFormat11 = ['<I']
+    structFormat12 = ['<I']
 
     def __init__(self, major, minor, name, objectCount,
-                 detailCount, lightCount):
+                 detailCount, lightCount=0, soundCount=0):
         self.major = major
         self.minor = minor
         self.name = name
         self.objectCount = objectCount
         self.detailCount = detailCount
         self.lightCount = lightCount
+        self.soundCount = soundCount
 
 
 class OWMAPRecord:
@@ -319,3 +323,13 @@ class OWMDLRefposeBone:
         self.pos = pos
         self.scale = scale
         self.rot = rot
+
+
+class OWMAPSound:
+    structFormat = [str]
+    exFormat = ['<fff', '<i']
+
+    def __init__(self, position, soundCount, sounds=list()):
+        self.position = position
+        self.soundCount = soundCount
+        self.sounds = sounds

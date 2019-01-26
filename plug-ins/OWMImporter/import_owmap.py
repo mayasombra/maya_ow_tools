@@ -4,13 +4,34 @@ import maya.cmds as cmds
 from maya.api.OpenMaya import MQuaternion as Quaternion
 from maya.api.OpenMaya import MEulerRotation as Euler
 
-# from OWMImporter.commonfuncs import *
+from OWMImporter.commonfuncs import adjustAxis, wadjustAxis, MayaSafeName
 from OWMImporter import read_owmap
 from OWMImporter import import_owmdl
 from OWMImporter import import_owmat
 
 sameMeshData = False
 settings = None
+
+
+def importModel(obfile, obn):
+    global settings
+
+    try:
+        obj = None
+
+        if settings.MapImportModelsAs == 1:
+            if obfile.endswith(".owentity"):
+                print "OWEntity not yet supported. Filename: %s" % obfile
+                return obj
+            else:
+                obj = import_owmdl.read(obfile, settings)
+        else:
+            obj = (cmds.spaceLocator(name=obn), "None")
+            return obj
+
+    except Exception as e:
+        print "Error importing map object. Error: %s" % e
+        return None
 
 
 def normalizeColor(inCol):
@@ -34,7 +55,7 @@ def quat2euler(q):
     return qe
 
 
-def quatrotate(inobj,quat):
+def quatrotate(inobj, quat):
     if not inobj:
         return
     q = Quaternion(quat[0], quat[1], quat[2], quat[3])
@@ -49,11 +70,8 @@ def quatrotate(inobj,quat):
 
 
 def remove(obj):
-    for child in obj.children:
-        remove(child)
-    try:
-        bpy.context.scene.objects.unlink(obj)
-    except: pass
+    cmds.delete(obj)
+
 
 def readmap():
     global settings
@@ -61,178 +79,198 @@ def readmap():
     root, file = os.path.split(settings.filename)
 
     data = read_owmap.read(settings.filename)
-    if not data: return None
+    if not data:
+        return None
 
     rootName = data.header.name
     if len(rootName) == 0:
         rootName = os.path.splitext(file)[0]
 
     rootName = MayaSafeName(rootName)
-    print "rootName: %s"%rootName
+    print "rootName: %s" % rootName
 
-    rootGroupName = ("r_%s" % rootName)
-    rootObject = cmds.group(em=True, name=rootGroupName,w=True)
+    rootGroupName = MayaSafeName("r_%s" % rootName)
+    rootObject = cmds.group(em=True, name=rootGroupName, w=True)
     collisionMat = import_owmat.buildCollision("CollisionPhysics")
 
     matCache = {}
     lightNum = 0
 
     if settings.MapImportModels and settings.MapImportObjectsLarge:
-        #print "Exporting Large Objects"
-        refObj = cmds.group(em=True,n="%s_ObjectReferences"%rootName,p=rootObject)
+        # print "Exporting Large Objects"
+        refObj = cmds.group(em=True, n="%s_ObjectReferences" % rootName,
+                            p=rootObject)
         cmds.hide(refObj)
-        
+
         objCache = {}
-        
+
         for ob in data.objects:
             obfile = ob.model
+            obfile = obfile.replace('\\', os.sep)
             if not os.path.isabs(obfile):
                 obfile = os.path.normpath('%s/%s' % (root, obfile))
 
-            obn = "obj%s"%os.path.splitext(os.path.basename(obfile))[0]
-            print("Object Name: %s, Filename: %s"%(obn,obfile))
+            obn = "obj%s" % os.path.splitext(os.path.basename(obfile))[0]
+            print("Object Name: %s, Filename: %s" % (obn, obfile))
 
             obji = 0
             if obn in objCache:
                 objfound = True
-                while objfound == True:
+                while objfound:
                     obji = obji + 1
-                    if ("%s_%s"%(obn, obji) not in objCache):
+                    if ("%s_%s" % (obn, obji) not in objCache):
                         objfound = False
 
             if obji > 0:
-                obn = "%s_%s"%(obn, obji)
+                obn = "%s_%s" % (obn, obji)
 
+            settings.MapImportModelsAs = 1
             if settings.MapImportModelsAs == 1:
+                print "reading obfile ", obfile
                 obj = import_owmdl.read(obfile, settings, None, obji)
             else:
-                obj = (cmds.spaceLocator(name=obn),"None")
+                obj = (cmds.spaceLocator(name=obn), "None")
             objCache[obn] = obj
-            
+
             rlist = cmds.listRelatives(obj[0], allParents=True)
-            #print("rList: %s"%rlist)
-            
-            if (rlist == None) or (refObj not in rlist):
+            # print("rList: %s"%rlist)
+
+            if (rlist is None) or (refObj not in rlist):
                 cmds.parent(obj[0], refObj)
-            
+
             for idx, ent in enumerate(ob.entities):
                 material = None
                 matpath = ent.material
+                matpath = matpath.replace('\\', os.sep)
                 if not os.path.isabs(matpath):
                     matpath = os.path.normpath('%s/%s' % (root, matpath))
                 if settings.MapImportMaterials and len(ent.material) > 0:
-                    #print "MatPath: %s"%matpath
+                    # print "MatPath: %s"%matpath
                     if matpath not in matCache:
-                        material = import_owmat.read(matpath, '%s_%s_%X_' % (rootName, obn, idx))[0]
+                        material = import_owmat.read(
+                            matpath, '%s_%s_%X_' % (rootName, obn, idx))[0]
                         matCache[matpath] = material
                     else:
                         material = matCache[matpath]
                     if settings.MapImportModelsAs == 1:
-                        #print "Binding material %s to %s..."%(material, obj[2])
-                        #Only attempt to texture Models
+                        # print "Binding material %s to %s..." % (
+                        # material, obj[2])
+                        # Only attempt to texture Models
                         import_owmdl.bindMaterials(obj[2], obj[4], material)
                 else:
                     if settings.MapImportModelsAs == 1:
-                        #print "Binding material %s to %s..."%(material, obj[2])
-                        #Only attempt to texture Models
+                        # print "Binding material %s to %s..." % (
+                        # material, obj[2])
+                        # Only attempt to texture Models
                         import_owmdl.bindMaterials(obj[2], obj[4], "lambert1")
 
                 matID = os.path.splitext(os.path.basename(matpath))[0]
-                matObjName = "obj%s"%(os.path.splitext(os.path.basename(matpath))[0])
-                matObj = cmds.group(em=True,name=matObjName,parent=rootObject)
-                cmds.parent(matObj, obj)
+                matObjName = "mat%s" % (
+                    os.path.splitext(os.path.basename(matpath))[0])
+                matObj = cmds.group(
+                    em=True, name=matObjName, parent=rootObject)
 
-                mrec = len(cmds.ls("obj%s_*"%matID))
+                mrec = len(cmds.ls("obj%s_*" % matID))
                 for idx2, rec in enumerate(ent.records):
-                    nobj = cmds.instance(obj[0],name="obj%s_%i"%(matID,mrec),leaf=True)
-                    mrec = mrec +1
-                    #print "nobj: %s"%(nobj[0])
+                    nobj = cmds.instance(
+                        obj[0], name="obj%s_%i" % (matID, mrec), leaf=True)
+                    mrec = mrec + 1
                     cmds.parent(nobj[0], matObj)
-                    #print ("Position: %s, Rotation %s, scale: %s"%(rec.position,rec.rotation,rec.scale))
                     location = adjustAxis(rec.position)
                     cmds.move(location[0], location[1], location[2], nobj)
-                    quatrotate(nobj[0],wadjustAxis(rec.rotation))
+                    quatrotate(nobj[0], wadjustAxis(rec.rotation))
                     scale = rec.scale
-                    cmds.scale(scale[0],scale[1],scale[2], nobj)
+                    cmds.scale(scale[0], scale[1], scale[2], nobj)
 
-            #remove(obj[0])
+            remove(obj[0])
 
     if settings.MapImportModels and settings.MapImportObjectsDetail:
-        #print "Exporting Detail Objects"
-        globDet = cmds.group(em=True,n="%s_Details"%rootName,p=rootObject)
-        refDet = cmds.group(em=True,n="%s_DetailsReferences"%rootName,p=globDet)
+        # print "Exporting Detail Objects"
+        globDet = cmds.group(em=True, n="%s_Details" % rootName, p=rootObject)
+        refDet = cmds.group(em=True, n="%s_DetailsReferences" % rootName,
+                            p=globDet)
         cmds.hide(refDet)
-        
+
         objCache = {}
-        
+
         mrec = {}
         for ob in data.details:
             obfile = ob.model
+            obfile = obfile.replace('\\', os.sep)
             if not os.path.isabs(obfile):
                 obfile = os.path.normpath('%s/%s' % (root, obfile))
 
-            obn = "detail%s"%os.path.splitext(os.path.basename(obfile))[0]
-            print("Detail Name: %s, Filename: %s"%(obn,obfile))
+            obn = "detail%s" % os.path.splitext(os.path.basename(obfile))[0]
+            print("Detail Name: %s, Filename: %s" % (obn, obfile))
 
-            if obn == 'detailphysics' and (settings.MapImportObjectsPhysics == 0 or settings.MapImportModelsAs == 2):
+            if obn == 'detailphysics' and (
+                settings.MapImportObjectsPhysics == 0 or
+                    settings.MapImportModelsAs == 2):
                 continue
-                
+
             obji = 0
             if obn in objCache:
                 objfound = True
-                while objfound == True:
+                while objfound:
                     obji = obji + 1
-                    if ("%s_%s"%(obn, obji) not in objCache):
+                    if ("%s_%s" % (obn, obji) not in objCache):
                         objfound = False
 
             if obji > 0:
-                obn = "%s_%s"%(obn, obji)
+                obn = "%s_%s" % (obn, obji)
 
             obj = None
             if obn in objCache:
                 obj = objCache[obn]
             else:
-                if settings.MapImportModelsAs == 1:
-                    obj = import_owmdl.read(obfile, settings)
-                else:
-                    obj = (cmds.spaceLocator(name=obn),"None")
+                obj = importModel(obfile, obn)
+                if not obj:
+                    print "Bad/Invalid Object: %s. Skipping to next one..."
+                    continue
+
                 objCache[obn] = obj
-                
+
             rlist = cmds.listRelatives(obj[0], allParents=True)
-            #print("rList: %s"%rlist)
-            
-            if (rlist == None) or (refDet not in rlist):
+            # print("rList: %s"%rlist)
+
+            if (rlist is None) or (refDet not in rlist):
                 cmds.parent(obj[0], refDet)
-                
+
             if settings.MapImportMaterials and len(ob.material) > 0:
                 matpath = ob.material
+                matpath = matpath.replace('\\', os.sep)
                 if not os.path.isabs(matpath):
                     matpath = os.path.normpath('%s/%s' % (root, matpath))
                 material = None
                 if matpath not in matCache:
-                    material = import_owmat.read(matpath, '%s_%s_' % (rootName, obn))
+                    material = import_owmat.read(
+                        matpath, '%s_%s_' % (rootName, obn))
                     matCache[matpath] = material
                 else:
                     material = matCache[matpath]
                 if settings.MapImportModelsAs == 1:
-                    #Only attempt to texture Models
+                    # Only attempt to texture Models
                     import_owmdl.bindMaterials(obj[2], obj[4], material)
             if settings.MapImportMaterials and obn == 'detailphysics':
                 import_owmdl.bindMaterials(obj[2], obj[4], collisionMat)
-                #cmds.polyAutoProjection(obj[0], lm=1, pb=True, ibd=True, cm=False, l=0, sc=1, o=1, ps=0.2, ws=False)
+                # cmds.polyAutoProjection(
+                # obj[0], lm=1, pb=True, ibd=True, cm=False,
+                # l=0, sc=1, o=1, ps=0.2, ws=False)
 
-            if not obn in mrec:
+            if obn not in mrec:
                 mrec[obn] = 0
-            nobj = cmds.instance(obj[0],name="%s_%i"%(obn,mrec[obn]),leaf=True)
+            nobj = cmds.instance(
+                obj[0], name="%s_%i" % (obn, mrec[obn]), leaf=True)
             mrec[obn] = mrec[obn] + 1
-            #print "nobj: %s"%(nobj[0])
+            # print "nobj: %s"%(nobj[0])
             cmds.parent(nobj[0], globDet)
-            #print ("Position: %s, Rotation %s, scale: %s"%(ob.position,ob.rotation,ob.scale))
+            # print ("Position: %s, Rotation %s, scale: %s" % (
+            # ob.position,ob.rotation,ob.scale))
             location = adjustAxis(ob.position)
             cmds.move(location[0], location[1], location[2], nobj)
-            quatrotate(nobj[0],wadjustAxis(ob.rotation))
+            quatrotate(nobj[0], wadjustAxis(ob.rotation))
             scale = ob.scale
-            cmds.scale(scale[0],scale[1],scale[2], nobj)
+            cmds.scale(scale[0], scale[1], scale[2], nobj)
 
     if settings.MapImportLights and len(data.lights) > 0:
         lightlist = [None] * len(data.lights)
@@ -240,44 +278,64 @@ def readmap():
             color, inten = normalizeColor(light.Color)
             if color == light.Color and inten != 1.0:
                 inten = 1.0
-            lightName = "%s_Light_%03i"%(rootName, lightNum)
+            lightName = "%s_Light_%03i" % (rootName, lightNum)
             lightNum = lightNum + 1
-        
+
             pos = adjustAxis(light.position)
             ca = light.LightFOV
             if light.LightType == 1 and ca == -1.0:
-                print "Light %s is a Spotlight with -1.0 cone angle. Defaulting to 45 degrees..."%lightName
+                print ("Light %s is a Spotlight with -1.0 cone angle. "
+                       "Defaulting to 45 degrees..." % lightName)
                 ca = 45
-        
-            print "Name: %s\n    Position: %s\n    Rotation: %s\n    Light Type: %s\n    Light FOV: %s, Cone Angle: %s\n    Color: %s, Normalized Color: %s, Normalized Intensity: %s"%(lightName, light.position, light.rotation, light.LightType, light.LightFOV, ca, light.Color, color, inten)
-        
+
+            # print "Name: %s\n    Position: %s\n    Rotation: %s\n    ",
+            # print "Light Type: %s\n    Light FOV: %s, Cone Angle: %s\n    ",
+            # print "Color: %s, Normalized Color: %s, Normalized ",
+            # print "Intensity: %s"%(lightName, light.position, light.rotation,
+            # light.LightType, light.LightFOV, ca, light.Color, color, inten)
+
             if light.LightType == 0:
-                LObjName = cmds.directionalLight(name=lightName, intensity=inten, rgb=color)
+                LObjName = cmds.directionalLight(
+                    name=lightName, intensity=inten, rgb=color)
             elif light.LightType == 1:
-                LObjName = cmds.spotLight(name=lightName, intensity=inten, rgb=color, coneAngle=ca)
+                LObjName = cmds.spotLight(
+                    name=lightName, intensity=inten, rgb=color, coneAngle=ca)
             elif light.LightType == 2:
-                LObjName = cmds.pointLight(name=lightName, intensity=inten, rgb=color)
+                LObjName = cmds.pointLight(
+                    name=lightName, intensity=inten, rgb=color)
             else:
-                print "%s has an Unknown Light Type: %s"%(lightName, light.LightType)
+                print "%s has an Unknown Light Type: %s" % (
+                    lightName, light.LightType)
                 pass
 
             cmds.move(pos[0], pos[1], pos[2], LObjName)
-            quatrotate(LObjName,wadjustAxis(light.rotation))
+            quatrotate(LObjName, wadjustAxis(light.rotation))
             lightlist[lightNum-1] = LObjName
 
             # Research Data output
-            
-            #print "    uk1a: %s, uk1b: %s\n    uk2a: %s, uk2b: %s, uk2c: %s, uk2d: %s\n    uk3a: %s, uk3b: %s\n    ukPos1: %s, ukQuat1: %s\n    ukPos2: %s, ukQuat2: %s\n    ukPos3: %s\n    uk4a: %s\n    uk4b: %s\n    uk8b: %s, uk8c: %s\n    uk9: %s\n    uk10a: %s, uk10b: %s\n    uk11a: %s, uk11b: %s\n"%(light.uk1a, light.uk1b, light.uk2a, light.uk2b, light.uk2c, light.uk2d, light.uk3a, light.uk3b, light.ukp1, light.ukq1, light.ukp2, light.ukq2, light.ukp3, light.uk4a, light.uk4b, light.uk8b, light.uk8c, light.uk9, light.uk10a, light.uk10b, light.uk11a, light.uk11b)
-        
-        globLights = cmds.group(tuple(lightlist), n="%s_Lights"%rootName,p=rootObject)
 
-def read(infilename, inputsettings, sMD = True):
+            # print "    uk1a: %s, uk1b: %s\n    uk2a: %s, uk2b: %s, uk2c: %s,"
+            # uk2d: %s\n    uk3a: %s, uk3b: %s\n    ukPos1: %s, ukQuat1: %s\n
+            # ukPos2: %s, ukQuat2: %s\n    ukPos3: %s\n    uk4a: %s\n    uk4b:
+            # %s\n    uk8b: %s, uk8c: %s\n    uk9: %s\n    uk10a: %s, uk10b:
+            # %s\n    uk11a: %s, uk11b: %s\n"%(light.uk1a, light.uk1b,
+            # light.uk2a, light.uk2b, light.uk2c, light.uk2d, light.uk3a,
+            # light.uk3b, light.ukp1, light.ukq1, light.ukp2, light.ukq2,
+            # light.ukp3, light.uk4a, light.uk4b, light.uk8b, light.uk8c,
+            # light.uk9, light.uk10a, light.uk10b, light.uk11a, light.uk11b)
+
+        cmds.group(tuple(lightlist), n="%s_Lights" % rootName,
+                   p=rootObject)
+
+
+def read(infilename, inputsettings, sMD=True):
     global settings
     global sameMeshData
     sameMeshData = sMD
-    
-    settings = inputsettings
+
+    settings = inputsettings or import_owmdl.DefSettings()
     settings.filename = infilename
-    
+
     status = readmap()
+    cmds.select(d=True)
     return status
