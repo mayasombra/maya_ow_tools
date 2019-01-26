@@ -9,25 +9,17 @@ from OWMImporter import read_owmap
 from OWMImporter import import_owmdl
 from OWMImporter import import_owmat
 
-sameMeshData = False
-settings = None
 
-
-def importModel(obfile, obn):
-    global settings
-
+def importModel(settings, obfile, obn):
     try:
-        obj = None
-
         if settings.MapImportModelsAs == 1:
             if obfile.endswith(".owentity"):
                 print "OWEntity not yet supported. Filename: %s" % obfile
-                return obj
+                return None
             else:
-                obj = import_owmdl.read(obfile, settings)
+                return import_owmdl.read(obfile, settings)
         else:
-            obj = (cmds.spaceLocator(name=obn), "None")
-            return obj
+            return (cmds.spaceLocator(name=obn), "None")
 
     except Exception as e:
         print "Error importing map object. Error: %s" % e
@@ -73,12 +65,11 @@ def remove(obj):
     cmds.delete(obj)
 
 
-def readmap():
-    global settings
+def readmap(settings, filename):
     print "Reading Map..."
-    root, file = os.path.split(settings.filename)
+    root, file = os.path.split(filename)
 
-    data = read_owmap.read(settings.filename)
+    data = read_owmap.read(filename)
     if not data:
         return None
 
@@ -98,8 +89,9 @@ def readmap():
 
     if settings.MapImportModels and settings.MapImportObjectsLarge:
         # print "Exporting Large Objects"
+        globObj = cmds.group(em=True, n="%s_Objects" % rootName, p=rootObject)
         refObj = cmds.group(em=True, n="%s_ObjectReferences" % rootName,
-                            p=rootObject)
+                            p=globObj)
         cmds.hide(refObj)
 
         objCache = {}
@@ -124,7 +116,6 @@ def readmap():
             if obji > 0:
                 obn = "%s_%s" % (obn, obji)
 
-            settings.MapImportModelsAs = 1
             if settings.MapImportModelsAs == 1:
                 print "reading obfile ", obfile
                 obj = import_owmdl.read(obfile, settings, None, obji)
@@ -168,7 +159,7 @@ def readmap():
                 matObjName = "mat%s" % (
                     os.path.splitext(os.path.basename(matpath))[0])
                 matObj = cmds.group(
-                    em=True, name=matObjName, parent=rootObject)
+                    em=True, name=matObjName, parent=globObj)
 
                 mrec = len(cmds.ls("obj%s_*" % matID))
                 for idx2, rec in enumerate(ent.records):
@@ -181,8 +172,6 @@ def readmap():
                     quatrotate(nobj[0], wadjustAxis(rec.rotation))
                     scale = rec.scale
                     cmds.scale(scale[0], scale[1], scale[2], nobj)
-
-            remove(obj[0])
 
     if settings.MapImportModels and settings.MapImportObjectsDetail:
         # print "Exporting Detail Objects"
@@ -223,15 +212,15 @@ def readmap():
             if obn in objCache:
                 obj = objCache[obn]
             else:
-                obj = importModel(obfile, obn)
+                obj = importModel(settings, obfile, obn)
                 if not obj:
-                    print "Bad/Invalid Object: %s. Skipping to next one..."
+                    print ("Bad/Invalid Object: %s. "
+                           "Skipping to next one..." % obj)
                     continue
 
                 objCache[obn] = obj
 
             rlist = cmds.listRelatives(obj[0], allParents=True)
-            # print("rList: %s"%rlist)
 
             if (rlist is None) or (refDet not in rlist):
                 cmds.parent(obj[0], refDet)
@@ -328,14 +317,9 @@ def readmap():
                    p=rootObject)
 
 
-def read(infilename, inputsettings, sMD=True):
-    global settings
-    global sameMeshData
-    sameMeshData = sMD
+def read(infilename, inputsettings):
+    settings = inputsettings
 
-    settings = inputsettings or import_owmdl.DefSettings()
-    settings.filename = infilename
-
-    status = readmap()
+    status = readmap(settings, infilename)
     cmds.select(d=True)
     return status

@@ -1,7 +1,7 @@
 import os
 import maya.cmds as cmds
 
-from OWMImporter import read_owmat, redshift, options, stingray
+from OWMImporter import read_owmat, redshift, settings, stingray
 
 
 def buildCollision(mname):
@@ -42,7 +42,7 @@ def buildShader(root, mname, material, textureList):
             texture, root, textureList)
         texture_nodes[typ] = (file_node, name, realpath)
 
-    if options.get_setting('renderer') == 'Redshift':
+    if settings.get_setting('Renderer') == 'Redshift':
         return redshift.buildRedshift(material, mname, texture_nodes)
 
     # Stingray by default

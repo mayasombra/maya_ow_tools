@@ -15,7 +15,6 @@ from OWMImporter import read_owmdl
 from OWMImporter import import_owmat
 
 root = ''
-settings = None
 data = None
 rootObject = None
 BoneNames = []
@@ -208,7 +207,6 @@ def bindMaterials(meshes, data, materials):
 
 
 def importMesh(rootName, armature, meshData):
-    global settings
     global rootObject
 
     start = time.time()
@@ -410,7 +408,7 @@ def boneTailMiddle(eb):
                 bone.use_connect = True
 
 
-def readmdl(materials=None, instanceCount=0):
+def readmdl(settings, filename, materials=None, instanceCount=0):
     global root
     global data
     global rootObject
@@ -418,11 +416,12 @@ def readmdl(materials=None, instanceCount=0):
     currentlinear = cmds.currentUnit(query=True, linear=True)
     currentangle = cmds.currentUnit(query=True, angle=True)
     cmds.currentUnit(linear="cm", angle="deg")
-    root, file = os.path.split(settings.filename)
+    root, file = os.path.split(filename)
 
     readStart = time.time()
-    data = read_owmdl.read(settings.filename)
+    data = read_owmdl.read(filename)
     if not data:
+        print "Model read for %s failed" % filename
         return None
     if LOG_TIMING_STATS:
         print "read time: ", time.time() - readStart
@@ -468,46 +467,9 @@ def readmdl(materials=None, instanceCount=0):
     return (rootObject, armature, meshes, empties, data)
 
 
-class DefSettings:
-        def __init__(self,
-                     MapImportModels=True,
-                     MatImportTextures=True,
-                     MapImportMaterials=True,
-                     MapImportLights=True,
-                     MapImportModelsAs=1,
-                     MapImportObjectsLarge=True,
-                     MapImportObjectsDetail=True,
-                     MapImportObjectsPhysics=False,
-                     ModelImportMaterials=True,
-                     ModelImportBones=True,
-                     ModelImportEmpties=False,
-                     MapHideReferenceModels=True):
-            self.MatImportTextures = int(MatImportTextures)
-
-            self.MapImportModels = int(MapImportModels)
-            self.MapImportMaterials = int(MapImportMaterials)
-            self.MapImportLights = int(MapImportLights)
-            self.MapImportModelsAs = int(MapImportModelsAs)
-
-            self.MapImportObjectsLarge = int(MapImportObjectsLarge)
-            self.MapImportObjectsDetail = int(MapImportObjectsDetail)
-            self.MapImportObjectsPhysics = int(MapImportObjectsPhysics)
-
-            self.ModelImportMaterials = int(ModelImportMaterials)
-            self.ModelImportBones = int(ModelImportBones)
-            self.ModelImportEmpties = int(ModelImportEmpties)
-
-            self.MapHideReferenceModels = int(MapHideReferenceModels)
-
-
-def read(aux, inputsettings, materials=None, instanceCount=0):
-    global settings
-    settings = inputsettings or DefSettings()
-
-    settings.filename = aux
-
+def read(filename, settings, materials=None, instanceCount=0):
     start = time.time()
-    status = readmdl(materials, instanceCount)
+    status = readmdl(settings, filename, materials, instanceCount)
     if LOG_TIMING_STATS:
         print "loading time: ", time.time() - start
     cmds.select(d=True)

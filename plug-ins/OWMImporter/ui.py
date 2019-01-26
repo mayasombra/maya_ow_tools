@@ -1,11 +1,9 @@
-import options
+import settings
 import os.path
 import maya.cmds as cmds
 import maya.mel as mel
 
 from OWMImporter import import_owmdl, import_owmap
-
-renderers = ['Stingray', 'Arnold', 'Redshift']
 
 
 def about_window():
@@ -79,10 +77,6 @@ def create_menu(hook):
                       annotation="Configure options for plugin",
                       command=lambda x: options_menu())
 
-        cmds.menuItem(label="Print Selected Renderer",
-                      annotation="...",
-                      command=lambda x: options.print_selected_renderer())
-
     # Reload and about controls
     finally:
         cmds.menuItem(label="Reload Plugin", command=lambda x: reload_plugin(
@@ -99,31 +93,40 @@ def options_menu():
     cmds.frameLayout(cll=True, label='Global Options')
     cmds.columnLayout()
     cmds.checkBox(l='Import Textures',
-                  v=options.get_setting('import_textures', bool),
-                  cc=lambda x: options.change_setting('import_textures', x),
+                  v=int(settings.get_setting('MapImportTextures')),
+                  cc=lambda x: settings.change_setting('MapImportTextures', x),
                   en=True)
     cmds.checkBox(l='Hide Reference Models', v=True)
     cmds.setParent('..')
     cmds.setParent('..')
     cmds.frameLayout(cll=True, label='Model Options')
     cmds.columnLayout()
-    cmds.checkBoxGrp(ncb=3, l='Models Import: ',
-                     la3=['Materials', 'Bones', 'Empty Objects'],
-                     va3=[1, 1, 1], en3=True)
+    cmds.checkBoxGrp(ncb=3, l='Maps Import: ',
+                     la3=['Models', 'Materials', 'Lights Objects'],
+                     ann='Choose what to import.',
+                     v1=int(settings.get_setting('MapImportModels')),
+                     v2=int(settings.get_setting('MapImportMaterials')),
+                     v3=int(settings.get_setting('MapImportLights')),
+                     cc1=lambda x: cs('MapImportModels', x),
+                     cc2=lambda x: cs('MapImportMaterials', x),
+                     cc3=lambda x: cs('MapImportLights', x),
+                     en3=True)
     cmds.setParent('..')
     cmds.setParent('..')
     cmds.frameLayout(cll=True, label='Render Options')
     cmds.columnLayout()
-    rm = cmds.optionMenu(l='Model Renderer', cc=options.selectRenderer)
-    for r in options.renderers:
+    rm = cmds.optionMenu(l='Model Renderer',
+                         cc=lambda x: settings.change_setting('Renderer', x))
+    rs = settings.renderers
+    for r in rs:
         cmds.menuItem(l=r)
 
     cmds.optionMenu(rm, e=True,
-                    sl=renderers.index(options.get_setting('renderer'))+1)
+                    sl=rs.index(settings.get_setting('Renderer'))+1)
     cmds.setParent('..')
 
     footer = cmds.formLayout()
-    save = cmds.button(l='Save', command=lambda x: options.save_settings())
+    save = cmds.button(l='Save', command=lambda x: settings.save_settings())
     close = cmds.button(l='Close', command=lambda x: cmds.deleteUI(window))
     cmds.formLayout(footer, e=True, af=[
         (save, "left", 5), (save, "bottom", 5),
@@ -134,18 +137,22 @@ def options_menu():
     cmds.showWindow()
 
 
+def cs(k, v):
+    settings.change_setting(k, v)
+
+
 def import_owmapp():
     import_file = importfile_dialog(
         "OWMAP Files (*.owmap)", "Import OWMAP")
     if import_file:
-        import_owmap.read(import_file, None)
+        import_owmap.read(import_file, settings.Settings)
 
 
 def import_owmodel():
     import_file = importfile_dialog(
         "OWMDL Files (*.owmdl)", "Import OWMDL")
     if import_file:
-        import_owmdl.read(import_file, None)
+        import_owmdl.read(import_file, settings.Settings)
 
 
 def reload_plugin(hook):
