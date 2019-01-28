@@ -10,7 +10,9 @@ from OWMImporter import import_owmdl
 from OWMImporter import import_owmat
 
 
-DEBUG_DATA_SIZE = 5
+# Set to a non-zero value to limit reading objects. This helps
+# debugging since a map takes several minutes to read.
+DEBUG_DATA_SIZE = 0
 
 
 def instance_with_prs(name, source, parent, position, rotation, scale):

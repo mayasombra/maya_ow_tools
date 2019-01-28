@@ -7,7 +7,7 @@ import maya.OpenMayaMPx as OpenMayaMPx
 from OWMImporter import ui, bin_ops, read_owmat, read_owmdl, read_owmap
 from OWMImporter import import_owmat, import_owmdl, import_owmap, settings
 
-Version = "0.7.0 Alpha"
+Version = "0.7.1"
 
 
 def __remove_menu__():
