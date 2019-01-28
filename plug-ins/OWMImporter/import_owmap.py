@@ -10,6 +10,18 @@ from OWMImporter import import_owmdl
 from OWMImporter import import_owmat
 
 
+DEBUG_DATA_SIZE = 5
+
+
+def instance_with_prs(name, source, parent, position, rotation, scale):
+    nobj = cmds.instance(source, name=name, leaf=True)
+    cmds.parent(nobj[0], parent)
+    loc = adjustAxis(position)
+    cmds.move(loc[0], loc[1], loc[2], nobj)
+    quatrotate(nobj[0], wadjustAxis(rotation))
+    cmds.scale(scale[0], scale[1], scale[2], nobj)
+
+
 def importModel(settings, obfile, obn):
     try:
         if settings.MapImportModelsAs == 1:
@@ -47,6 +59,8 @@ def quat2euler(q):
     return qe
 
 
+# TODO: move this to commonfuncs simce import_owmdl does something
+# similar now.
 def quatrotate(inobj, quat):
     if not inobj:
         return
@@ -78,7 +92,6 @@ def readmap(settings, filename):
         rootName = os.path.splitext(file)[0]
 
     rootName = MayaSafeName(rootName)
-    print "rootName: %s" % rootName
 
     rootGroupName = MayaSafeName("r_%s" % rootName)
     rootObject = cmds.group(em=True, name=rootGroupName, w=True)
@@ -96,6 +109,9 @@ def readmap(settings, filename):
 
         objCache = {}
 
+        if DEBUG_DATA_SIZE:
+            data.objects = data.objects[0:DEBUG_DATA_SIZE]
+
         for ob in data.objects:
             obfile = ob.model
             obfile = obfile.replace('\\', os.sep)
@@ -103,7 +119,6 @@ def readmap(settings, filename):
                 obfile = os.path.normpath('%s/%s' % (root, obfile))
 
             obn = "obj%s" % os.path.splitext(os.path.basename(obfile))[0]
-            print("Object Name: %s, Filename: %s" % (obn, obfile))
 
             obji = 0
             if obn in objCache:
@@ -116,8 +131,9 @@ def readmap(settings, filename):
             if obji > 0:
                 obn = "%s_%s" % (obn, obji)
 
+            # Either use the model or a placeholder object based on
+            # the settings.
             if settings.MapImportModelsAs == 1:
-                print "reading obfile ", obfile
                 obj = import_owmdl.read(obfile, settings, None, obji)
             else:
                 obj = (cmds.spaceLocator(name=obn), "None")
@@ -136,7 +152,6 @@ def readmap(settings, filename):
                 if not os.path.isabs(matpath):
                     matpath = os.path.normpath('%s/%s' % (root, matpath))
                 if settings.MapImportMaterials and len(ent.material) > 0:
-                    # print "MatPath: %s"%matpath
                     if matpath not in matCache:
                         material = import_owmat.read(
                             matpath, '%s_%s_%X_' % (rootName, obn, idx))[0]
@@ -144,14 +159,10 @@ def readmap(settings, filename):
                     else:
                         material = matCache[matpath]
                     if settings.MapImportModelsAs == 1:
-                        # print "Binding material %s to %s..." % (
-                        # material, obj[2])
                         # Only attempt to texture Models
                         import_owmdl.bindMaterials(obj[2], obj[4], material)
                 else:
                     if settings.MapImportModelsAs == 1:
-                        # print "Binding material %s to %s..." % (
-                        # material, obj[2])
                         # Only attempt to texture Models
                         import_owmdl.bindMaterials(obj[2], obj[4], "lambert1")
 
@@ -163,15 +174,10 @@ def readmap(settings, filename):
 
                 mrec = len(cmds.ls("obj%s_*" % matID))
                 for idx2, rec in enumerate(ent.records):
-                    nobj = cmds.instance(
-                        obj[0], name="obj%s_%i" % (matID, mrec), leaf=True)
-                    mrec = mrec + 1
-                    cmds.parent(nobj[0], matObj)
-                    location = adjustAxis(rec.position)
-                    cmds.move(location[0], location[1], location[2], nobj)
-                    quatrotate(nobj[0], wadjustAxis(rec.rotation))
-                    scale = rec.scale
-                    cmds.scale(scale[0], scale[1], scale[2], nobj)
+                    name = "obj%s_%i" % (matID, mrec)
+                    mrec += 1
+                    instance_with_prs(name, obj[0], matObj,
+                                      rec.position, rec.rotation, rec.scale)
 
     if settings.MapImportModels and settings.MapImportObjectsDetail:
         # print "Exporting Detail Objects"
@@ -183,6 +189,10 @@ def readmap(settings, filename):
         objCache = {}
 
         mrec = {}
+
+        if DEBUG_DATA_SIZE:
+            data.details = data.details[0:DEBUG_DATA_SIZE]
+
         for ob in data.details:
             obfile = ob.model
             obfile = obfile.replace('\\', os.sep)
@@ -190,7 +200,6 @@ def readmap(settings, filename):
                 obfile = os.path.normpath('%s/%s' % (root, obfile))
 
             obn = "detail%s" % os.path.splitext(os.path.basename(obfile))[0]
-            print("Detail Name: %s, Filename: %s" % (obn, obfile))
 
             if obn == 'detailphysics' and (
                 settings.MapImportObjectsPhysics == 0 or
@@ -248,18 +257,11 @@ def readmap(settings, filename):
 
             if obn not in mrec:
                 mrec[obn] = 0
-            nobj = cmds.instance(
-                obj[0], name="%s_%i" % (obn, mrec[obn]), leaf=True)
+
+            name = "%s_%i" % (obn, mrec[obn])
             mrec[obn] = mrec[obn] + 1
-            # print "nobj: %s"%(nobj[0])
-            cmds.parent(nobj[0], globDet)
-            # print ("Position: %s, Rotation %s, scale: %s" % (
-            # ob.position,ob.rotation,ob.scale))
-            location = adjustAxis(ob.position)
-            cmds.move(location[0], location[1], location[2], nobj)
-            quatrotate(nobj[0], wadjustAxis(ob.rotation))
-            scale = ob.scale
-            cmds.scale(scale[0], scale[1], scale[2], nobj)
+            instance_with_prs(name, obj[0], globDet,
+                              ob.position, ob.rotation, ob.scale)
 
     if settings.MapImportLights and len(data.lights) > 0:
         lightlist = [None] * len(data.lights)
