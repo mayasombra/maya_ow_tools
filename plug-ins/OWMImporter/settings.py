@@ -51,7 +51,10 @@ class DefSettings:
                     x.split('=') for x in settings.split(';')]}
                 for key in pluginSettings:
                     if hasattr(self, key):
-                        setattr(self, key, pluginSettings[key])
+                        # Convert the stringified value back to the
+                        # appropriate type
+                        t = type(getattr(self, key))
+                        setattr(self, key, t(pluginSettings[key]))
 
 
 def change_setting(name, val):
