@@ -14,38 +14,31 @@ from OWMImporter.commonfuncs import MayaSafeName
 from OWMImporter import read_owmdl
 from OWMImporter import import_owmat
 
-root = ''
-data = None
-rootObject = None
-BoneNames = []
-
 LOG_TIMING_STATS = False
 LOG_DEBUG_STATS = False
 LOG_SKIN_DETAILS = False
 
 
-def newBoneName():
-    global BoneNames
-    BoneNames = []
+class Skeleton:
+    def __init__(self):
+        self.BoneNames = {}
+        self.BoneIndexes = {}
+        self.BoneObjects = {}
 
+    def add(self, name, objname):
+        idx = len(self.BoneNames)
+        self.BoneNames[name] = idx
+        self.BoneIndexes[idx] = name
+        self.BoneObjects[name] = objname
 
-def addBoneName(newName):
-    global BoneNames
-    BoneNames += [newName]
+    def getName(self, idx):
+        return self.BoneIndexes.get(idx)
 
+    def getIndex(self, name):
+        return self.BoneNames.get(name)
 
-def getBoneName(originalIndex):
-    if originalIndex < len(BoneNames):
-        return BoneNames[originalIndex]
-    else:
-        return None
-
-
-def getBoneNameIndex(Name):
-    for index in range(len(BoneNames)):
-        bn = BoneNames[index]
-        if bn == Name:
-            return index
+    def getObjname(self, name):
+        return self.BoneObjects.get(name)
 
 
 class UVTarget:
@@ -56,6 +49,13 @@ class UVTarget:
         self.y = iy
 
 
+def scopedSelect(root, name):
+    cmds.select(root, hi=True)
+    objname = cmds.ls(name, sl=True)[0]
+    cmds.select(objname, r=True)
+    return objname
+
+
 def fixLength(bone):
     default_length = 0.005
     if bone.length == 0:
@@ -64,29 +64,35 @@ def fixLength(bone):
         bone.length = default_length
 
 
-def importArmature(parentName):
+def importArmature(data, parentName):
     start = time.time()
     bones = data.bones
     armature = None
     if len(bones) > 0:
-        newBoneName()
+        skeleton = Skeleton()
 
         armname = ("Skeleton_%s" % parentName)
-        parentRoot = ("root_%s" % parentName)
+        armname = ("Skeleton")
+        parentRoot = parentName
         armature = cmds.group(em=True, name=armname, parent=parentRoot)
 
+        # The bones are not topologically sorted, and I'm too lazy
+        # to implement that. Therefore, we construct the skeleton in
+        # two passes. The first pass instantiates all the joints and
+        # the second pass parents bones to each other.
         for bone in bones:
-            parent = getBoneName(bone.parent)
-            if parent is not None:
-                # This select is necessary to get the bone parenting to work.
-                cmds.select(d=True)
-
             pos = adjustAxis(bone.pos)
             scale = adjustAxis(bone.scale)
             qrot = Quaternion(bone.rot[0], bone.rot[1],
                               bone.rot[2], bone.rot[3])
             erot = qrot.asEulerRotation()
 
+            # We create each bone with the armature selected, so they
+            # get it as the default parent. This allows us to then
+            # parent the bones to their correct parents. Without
+            # doing this select, each bone would be parented to the
+            # previously created bone.
+            cmds.select(armature)
             bbone = cmds.joint(name=bone.name,
                                rad=0.05,
                                p=(pos[0], pos[1], pos[2]),
@@ -96,13 +102,28 @@ def importArmature(parentName):
                                angleX=0,
                                angleY=0,
                                angleZ=0)
-            addBoneName(bbone)
-            if parent is not None:
-                cmds.connectJoint(bbone, parent, pm=True)
+            skeleton.add(bone.name, bbone)
+
+        for bone in bones:
+            parent = skeleton.getName(bone.parent)
+            bbone = skeleton.getObjname(bone.name)
+
+            if not parent:
+                continue
+
+            # Here, we account for multiple skeletons in the scene by
+            # selecting in the scope of armature we've created. That
+            # way, we find our 'local' bone.
+            pbone = scopedSelect(armature, parent)
+
+            # One immensely annoying attribute of the OWLib is that
+            # the first bone resolves as its own parent.
+            if parent is not None and parent != bone.name:
+                cmds.connectJoint(bbone, pbone, pm=True)
 
     if LOG_TIMING_STATS:
         print "importArmature(): ", time.time() - start
-    return armature
+    return armature, skeleton
 
 
 def segregate(vertex):
@@ -140,7 +161,7 @@ def detach(faces):
     return (f, fc)
 
 
-def getBoneWeights(boneData):
+def getBoneWeights(bones, boneData):
     bw = {}
     for vindex in range(len(boneData)):
         boneIDlist, weights = boneData[vindex]
@@ -151,7 +172,7 @@ def getBoneWeights(boneData):
             index = boneIDlist[idx]
             weight = weights[idx]
             if weight != 0:
-                name = getBoneName(index)
+                name = bones.getName(index)
                 if name is not None:
                     if (vindex not in bw):
                         bw[vindex] = {}
@@ -161,7 +182,7 @@ def getBoneWeights(boneData):
     return bw
 
 
-def bindMaterials(meshes, data, materials):
+def bindMaterials(rootObject, meshes, data, materials):
     start = time.time()
     if materials is None:
         cmds.warning("No materials to bind!")
@@ -185,7 +206,7 @@ def bindMaterials(meshes, data, materials):
             # print ("Mat[key]: %s" % materials.get(meshData.materialKey))
             mat = materials.get(meshData.materialKey)
             shape = "%sShape" % obj["name"]
-            cmds.select(shape, r=True)
+            objname = scopedSelect(rootObject, shape)
             if (mat[-2:] != "SG"):
                 mat = "%sSG" % mat
             # print ("Setting shape %s to mat %s" % (shape, mat))
@@ -193,33 +214,33 @@ def bindMaterials(meshes, data, materials):
             imgList = cmds.ls(type='file')
             for img in imgList:
                 try:
-                    UVSetName = "%sShape.uvSet[0].uvSetName" % obj["name"]
+                    UVSetName = "%s.uvSet[0].uvSetName" % objname
                     # print ("UVSet: %s, Img: %s"%(UVSetName,img))
                     cmds.uvLink(make=True, uvSet=UVSetName, texture=img)
-                except:
+                except Exception as e:
+                    print "Error binding uvset: ", e
                     pass
         else:
             # print("else: Lambert")
-            cmds.select("%sShape" % obj["name"], r=True)
+            scopedSelect(rootObject, "%sShape" % obj["name"])
             cmds.sets(forceElement="initialShadingGroup")
     if LOG_TIMING_STATS:
         print "bindMaterials(): ", time.time() - start
 
 
-def importMesh(rootName, armature, meshData):
-    global rootObject
-
+def importMesh(rootObject, armature, skeleton, meshData):
     start = time.time()
     rdata = {}
 
-    mfName = "submesh%s_%s" % (rootName, meshData.name.rsplit("_")[-1])
+    mfName = "submesh%s_%s" % (
+        rootObject[5:], meshData.name.rsplit("_")[-1])
     mfName = MayaSafeName(mfName)
     mfName = mfName.rsplit("_", 1)[0]
     meshName = cmds.createNode("transform", n=mfName, p=rootObject)
     pos, norms, uvs, boneData = segregate(meshData.vertices)
     faces, fcounts = detach(meshData.indices)
 
-    rdata["name"] = meshName
+    rdata["name"] = meshName.rsplit("|")[-1]
     rdata["materialKey"] = meshData.materialKey
 
     mesh = OpenMaya.MFnMesh()
@@ -264,7 +285,7 @@ def importMesh(rootName, armature, meshData):
     # Attach Bones
     if armature:
         skinStart = time.time()
-        bwd = getBoneWeights(boneData)
+        bwd = getBoneWeights(skeleton, boneData)
         if len(bwd) > 0:
             cmds.select(rootObject, r=True)
             jointList = cmds.ls(dag=True, type='joint', sl=True)
@@ -301,7 +322,7 @@ def importMesh(rootName, armature, meshData):
                     # we're subtracting out rounding error.
                     if sumWeights + weight > 1.0:
                         weight = 1.0 - sumWeights
-                    jidx = jointLookup[boneName]
+                    jidx = jointLookup[boneName.split("|")[-1]]
                     apiWeights[(index * numJoints) + jidx] = weight
                     sumWeights += weight
                 vertexNum = "%s.vtx[%i]" % (meshName, index)
@@ -324,9 +345,8 @@ def importMesh(rootName, armature, meshData):
     return rdata
 
 
-def importMeshes(rootName, armature):
-    global data
-    meshes = [importMesh(rootName, armature, meshData)
+def importMeshes(data, rootObject, armature, skeleton):
+    meshes = [importMesh(rootObject, armature, skeleton, meshData)
               for meshData in data.meshes]
     return meshes
 
@@ -351,68 +371,9 @@ def influenceObjects(skinCluster):
     return influences
 
 
-# def importEmpties():
-#     global data
-#     global settings
-#     global rootObject
-#
-#     if not settings.ModelImportEmpties:
-#         return []
-#
-#     att = bpy.data.objects.new('Empties', None)
-#     att.parent = rootObject
-#     att.hide = att.hide_render = True
-#     bpy.context.scene.objects.link(att)
-#     bpy.context.scene.update()
-#
-#     e = []
-#     for emp in data.empties:
-#         empty = bpy.data.objects.new(emp.name, None)
-#         bpy.context.scene.objects.link(empty)
-#         bpy.context.scene.update()
-#         empty.parent = att
-#         empty.location = adjustAxis(emp.position)
-#         empty.rotation_euler = Quaternion(
-#             wadjustAxis(emp.rotation)).to_euler('XYZ')
-#         empty.select = True
-#         bpy.context.scene.update()
-#         e += [empty]
-#     return e
-
-
-# def boneTailMiddleObject(armature):
-#     bpy.context.scene.objects.active = armature
-#     bpy.ops.object.mode_set(mode='EDIT', toggle=False)
-#     eb = armature.data.edit_bones
-#     boneTailMiddle(eb)
-#     bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
-
-
-def boneTailMiddle(eb):
-    for bone in eb:
-        if len(bone.children) > 0:
-            l = len(bone.children)
-            bone.tail = Vector(map(sum, zip(*(
-                child.head.xyz for child in bone.children))))/l
-        else:
-            if bone.parent is not None:
-                if bone.head.xyz != bone.parent.tail.xyz:
-                    delta = bone.head.xyz - bone.parent.tail.xyz
-                else:
-                    delta = bone.parent.tail.xyz - bone.parent.head.xyz
-                bone.tail = bone.head.xyz + delta
-    for bone in eb:
-        fixLength(bone)
-        if bone.parent:
-            if bone.head == bone.parent.tail:
-                bone.use_connect = True
-
+# TODO: the hardpoint importing code was removed. No idea what to do yet.
 
 def readmdl(settings, filename, materials=None, instanceCount=0):
-    global root
-    global data
-    global rootObject
-
     currentlinear = cmds.currentUnit(query=True, linear=True)
     currentangle = cmds.currentUnit(query=True, angle=True)
     cmds.currentUnit(linear="cm", angle="deg")
@@ -430,20 +391,15 @@ def readmdl(settings, filename, materials=None, instanceCount=0):
     if len(data.header.name) > 0:
         rootName = data.header.name
     rootName = MayaSafeName(rootName)
-    if instanceCount > 0:
-        rootName = "%s_%s" % (rootName, instanceCount)
-    rootGroupName = ("root_%s" % rootName)
-
-    if not cmds.objExists(rootGroupName):
-        rootObject = cmds.group(em=True, name=rootGroupName, w=True)
-    else:
-        rootObject = rootGroupName
+    rootGroupName = ("root_%s_0" % rootName)
+    rootObject = cmds.group(em=True, name=rootGroupName, w=True)
 
     armature = None
+    skeleton = None
     if settings.ModelImportBones and data.header.boneCount > 0:
-        armature = importArmature(rootName)
+        armature, skeleton = importArmature(data, rootObject)
 
-    meshes = importMeshes(rootName, armature)
+    meshes = importMeshes(data, rootObject, armature, skeleton)
 
     if materials is None and settings.ModelImportMaterials and len(
             data.header.material) > 0:
@@ -451,14 +407,11 @@ def readmdl(settings, filename, materials=None, instanceCount=0):
         if not os.path.isabs(matpath):
             matpath = os.path.normpath('%s/%s' % (root, matpath))
         materials, texList = import_owmat.read(matpath)
-        bindMaterials(meshes, data, materials)
+        bindMaterials(rootObject, meshes, data, materials)
 
     empties = []
     # if settings.ModelImportEmpties and data.header.emptyCount > 0:
     #    empties = importEmpties()
-
-    # if armature:
-    #    boneTailMiddleObject(armature)
 
     # if impMat:
     #    import_owmat.cleanUnusedMaterials(materials)
