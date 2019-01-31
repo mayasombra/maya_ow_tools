@@ -49,16 +49,23 @@ class DefSettings:
             if settings != "":
                 pluginSettings = {k: v for k, v in [
                     x.split('=') for x in settings.split(';')]}
-                for key in pluginSettings:
+                for key, val in pluginSettings.items():
+                    # Fix a bug where stringified bools were written
+                    # instead of integers.
+                    if val == 'True':
+                        val = True
+                    if val == 'False':
+                        val = False
                     if hasattr(self, key):
                         # Convert the stringified value back to the
                         # appropriate type
                         t = type(getattr(self, key))
-                        setattr(self, key, t(pluginSettings[key]))
+                        setattr(self, key, t(val))
 
 
 def change_setting(name, val):
-    setattr(Settings, name, val)
+    t = type(getattr(Settings, name))
+    setattr(Settings, name, t(val))
 
 
 def get_setting(name):
