@@ -104,5 +104,5 @@ def read(filename, prefix=''):
             shader = mname
         else:
             shader = buildShader(root, mname, material, textureList)
-            m[material.key] = shader
+        m[material.key] = shader
     return m, textureList
