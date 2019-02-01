@@ -85,7 +85,6 @@ def create_menu(hook):
 
 
 def options_menu():
-    global pluginSettings
     window = cmds.window(t='Overwatch Model Import Configuration')
     cmds.columnLayout(adj=True)
     cmds.text(l='TODO: none of these options except Model Renderer '
