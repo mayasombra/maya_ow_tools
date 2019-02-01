@@ -29,15 +29,11 @@ def buildCollision(mname):
 
 
 def buildShader(root, mname, material, textureList):
-    print "Building Stingray shader for material:", mname,
-    print " with OW shader type:", material.shader
-
     # Load textures
     texture_nodes = {}
     for texturetype in material.textures:
         typ = texturetype[2]
         texture = texturetype[0]
-        print "texture identifier: ", texture
         file_node, name, realpath = make_texture_node(
             texture, root, textureList)
         texture_nodes[typ] = (file_node, name, realpath)
