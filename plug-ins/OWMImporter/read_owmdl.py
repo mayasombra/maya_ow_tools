@@ -21,11 +21,6 @@ def read(filename, headerOnly=False):
         stream, owm_types.OWMDLHeader.structFormat)
     header = owm_types.OWMDLHeader(major, minor, materialstr, namestr,
                                    boneCount, meshCount, emptyCount)
-    print "major: ", major,
-    print "minor: ", minor,
-    print "meshCount: ", meshCount,
-    print "emptyCount: ", emptyCount
-
     if headerOnly:
         return header
     bones = []
@@ -127,7 +122,6 @@ def read(filename, headerOnly=False):
 
     guid = 0
     if minor >= 5 and major >= 1 and meshCount > 0:
-        print "attempting to read guid"
         guid = bin_ops.readFmtFlat(stream, owm_types.OWMDLHeader.guidFormat)
 
     return owm_types.OWMDLFile(
