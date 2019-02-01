@@ -16,7 +16,7 @@ DEBUG_DATA_SIZE = 0
 
 
 def instance_with_prs(name, source, parent, position, rotation, scale):
-    nobj = cmds.instance(source, name=name, leaf=True)
+    nobj = cmds.instance(source.rsplit("|")[-1], name=name, leaf=True)
     cmds.parent(nobj[0], parent)
     loc = adjustAxis(position)
     cmds.move(loc[0], loc[1], loc[2], nobj)
@@ -36,7 +36,7 @@ def importModel(settings, obfile, obn):
             return (cmds.spaceLocator(name=obn), "None")
 
     except Exception as e:
-        print "Error importing map object. Error: %s" % e
+        print "Error importing map object %s. Error: %s" % (obfile, e)
         return None
 
 
@@ -155,8 +155,7 @@ def readmap(settings, filename):
                     matpath = os.path.normpath('%s/%s' % (root, matpath))
                 if settings.MapImportMaterials and len(ent.material) > 0:
                     if matpath not in matCache:
-                        material = import_owmat.read(
-                            matpath, '%s_%s_%X_' % (rootName, obn, idx))[0]
+                        material = import_owmat.read(matpath)[0]
                         matCache[matpath] = material
                     else:
                         material = matCache[matpath]
@@ -208,9 +207,11 @@ def readmap(settings, filename):
                     settings.MapImportModelsAs == 2):
                 continue
 
+            obj = None
             obji = 0
             if obn in objCache:
                 objfound = True
+                obj = objCache[obn]
                 while objfound:
                     obji = obji + 1
                     if ("%s_%s" % (obn, obji) not in objCache):
@@ -219,14 +220,11 @@ def readmap(settings, filename):
             if obji > 0:
                 obn = "%s_%s" % (obn, obji)
 
-            obj = None
-            if obn in objCache:
-                obj = objCache[obn]
-            else:
+            if not obj:
                 obj = importModel(settings, obfile, obn)
                 if not obj:
-                    print ("Bad/Invalid Object: %s. "
-                           "Skipping to next one..." % obj)
+                    print ("Bad/Invalid Object: (%s:%s:%s). "
+                           "Skipping to next one..." % (obfile, obn, obji))
                     continue
 
                 objCache[obn] = obj
@@ -243,8 +241,7 @@ def readmap(settings, filename):
                     matpath = os.path.normpath('%s/%s' % (root, matpath))
                 material = None
                 if matpath not in matCache:
-                    material = import_owmat.read(
-                        matpath, '%s_%s_' % (rootName, obn))
+                    material = import_owmat.read(matpath)[0]
                     matCache[matpath] = material
                 else:
                     material = matCache[matpath]
