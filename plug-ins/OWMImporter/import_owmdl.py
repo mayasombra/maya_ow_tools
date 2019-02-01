@@ -49,13 +49,6 @@ class UVTarget:
         self.y = iy
 
 
-def scopedSelect(root, name):
-    cmds.select(root, hi=True)
-    objname = cmds.ls(name, sl=True)[0]
-    cmds.select(objname, r=True)
-    return objname
-
-
 def fixLength(bone):
     default_length = 0.005
     if bone.length == 0:
@@ -72,7 +65,6 @@ def importArmature(data, parentName):
         skeleton = Skeleton()
 
         armname = ("Skeleton_%s" % parentName)
-        armname = ("Skeleton")
         parentRoot = parentName
         armature = cmds.group(em=True, name=armname, parent=parentRoot)
 
@@ -114,7 +106,12 @@ def importArmature(data, parentName):
             # Here, we account for multiple skeletons in the scene by
             # selecting in the scope of armature we've created. That
             # way, we find our 'local' bone.
-            pbone = scopedSelect(armature, parent)
+            candidates = cmds.ls(parent, l=True)
+            pbone = None
+            for candidate in candidates:
+                path = candidate.split("|")
+                if armature in path:
+                    pbone = cmds.select(candidate)
 
             # One immensely annoying attribute of the OWLib is that
             # the first bone resolves as its own parent.
@@ -182,7 +179,7 @@ def getBoneWeights(bones, boneData):
     return bw
 
 
-def bindMaterials(rootObject, meshes, data, materials):
+def bindMaterials(meshes, data, materials):
     start = time.time()
     if materials is None:
         cmds.warning("No materials to bind!")
@@ -206,7 +203,7 @@ def bindMaterials(rootObject, meshes, data, materials):
             # print ("Mat[key]: %s" % materials.get(meshData.materialKey))
             mat = materials.get(meshData.materialKey)
             shape = "%sShape" % obj["name"]
-            objname = scopedSelect(rootObject, shape)
+            cmds.select(shape, r=True)
             if (mat[-2:] != "SG"):
                 mat = "%sSG" % mat
             # print ("Setting shape %s to mat %s" % (shape, mat))
@@ -214,29 +211,28 @@ def bindMaterials(rootObject, meshes, data, materials):
             imgList = cmds.ls(type='file')
             for img in imgList:
                 try:
-                    UVSetName = "%s.uvSet[0].uvSetName" % objname
+                    UVSetName = "%sShape.uvSet[0].uvSetName" % obj["name"]
                     # print ("UVSet: %s, Img: %s"%(UVSetName,img))
                     cmds.uvLink(make=True, uvSet=UVSetName, texture=img)
                 except Exception as e:
-                    print "Error binding uvset: ", e
+                    print "Error binding UVset: ", e
                     pass
         else:
             # print("else: Lambert")
-            scopedSelect(rootObject, "%sShape" % obj["name"])
+            cmds.select("%sShape" % obj["name"], r=True)
             cmds.sets(forceElement="initialShadingGroup")
     if LOG_TIMING_STATS:
         print "bindMaterials(): ", time.time() - start
 
 
-def importMesh(rootObject, armature, skeleton, meshData):
+def importMesh(rootName, armature, skeleton, meshData):
     start = time.time()
     rdata = {}
 
-    mfName = "submesh%s_%s" % (
-        rootObject[5:], meshData.name.rsplit("_")[-1])
+    mfName = "submesh%s_%s" % (rootName[5:], meshData.name.rsplit("_")[-1])
     mfName = MayaSafeName(mfName)
     mfName = mfName.rsplit("_", 1)[0]
-    meshName = cmds.createNode("transform", n=mfName, p=rootObject)
+    meshName = cmds.createNode("transform", n=mfName, p=rootName)
     pos, norms, uvs, boneData = segregate(meshData.vertices)
     faces, fcounts = detach(meshData.indices)
 
@@ -287,7 +283,7 @@ def importMesh(rootObject, armature, skeleton, meshData):
         skinStart = time.time()
         bwd = getBoneWeights(skeleton, boneData)
         if len(bwd) > 0:
-            cmds.select(rootObject, r=True)
+            cmds.select(rootName, r=True)
             jointList = cmds.ls(dag=True, type='joint', sl=True)
             clusterName = cmds.skinCluster(meshName, tuple(jointList),
                                            skinMethod=1)
@@ -322,7 +318,7 @@ def importMesh(rootObject, armature, skeleton, meshData):
                     # we're subtracting out rounding error.
                     if sumWeights + weight > 1.0:
                         weight = 1.0 - sumWeights
-                    jidx = jointLookup[boneName.split("|")[-1]]
+                    jidx = jointLookup[boneName]
                     apiWeights[(index * numJoints) + jidx] = weight
                     sumWeights += weight
                 vertexNum = "%s.vtx[%i]" % (meshName, index)
@@ -345,8 +341,8 @@ def importMesh(rootObject, armature, skeleton, meshData):
     return rdata
 
 
-def importMeshes(data, rootObject, armature, skeleton):
-    meshes = [importMesh(rootObject, armature, skeleton, meshData)
+def importMeshes(data, rootName, armature, skeleton):
+    meshes = [importMesh(rootName, armature, skeleton, meshData)
               for meshData in data.meshes]
     return meshes
 
@@ -407,7 +403,7 @@ def readmdl(settings, filename, materials=None, instanceCount=0):
         if not os.path.isabs(matpath):
             matpath = os.path.normpath('%s/%s' % (root, matpath))
         materials, texList = import_owmat.read(matpath)
-        bindMaterials(rootObject, meshes, data, materials)
+        bindMaterials(meshes, data, materials)
 
     empties = []
     # if settings.ModelImportEmpties and data.header.emptyCount > 0:

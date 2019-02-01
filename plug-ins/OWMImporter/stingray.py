@@ -1,6 +1,8 @@
 import maya.cmds as cmds
 import os
 
+DEBUG_OUTPUT = False
+
 
 def buildShader(material, mname, texture_nodes):
     # Build initial network
@@ -13,6 +15,7 @@ def buildShader(material, mname, texture_nodes):
     cmds.shaderfx(sfxnode=shader, initShaderAttributes=True)
 
     shader_dir = os.path.dirname(os.path.realpath(__file__))
+    material.shader = 44  # FIXME!!!
     shader_file = os.path.join(
         shader_dir, ('ow_shader_%d.sfx' % material.shader))
 
@@ -21,10 +24,13 @@ def buildShader(material, mname, texture_nodes):
                      force=True)
 
     for typ, (file_node, name, realpath) in texture_nodes.items():
-        print "new loop on %s:(%s,%s,%s)" % (typ, file_node, name, realpath)
+        if DEBUG_OUTPUT:
+            print "new loop on %s:(%s,%s,%s)" % (
+                typ, file_node, name, realpath)
         try:
             if typ == 2903569922 or typ == 1716930793 or typ == 1239794147:
-                print "binding color", typ, " on material ", mname
+                if DEBUG_OUTPUT:
+                    print "binding color", typ, " on material ", mname
                 cmds.setAttr("%s.use_color_map" % shader, 1)
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_color_map' % shader)
@@ -35,7 +41,8 @@ def buildShader(material, mname, texture_nodes):
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.emissive' % shader)
             elif typ == 378934698 or typ == 562391268:
-                print "binding normal", typ, " on material ", mname
+                if DEBUG_OUTPUT:
+                    print "binding normal", typ, " on material ", mname
                 cmds.setAttr("%s.use_normal_map" % shader, 1)
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_normal_map' % shader)
@@ -43,7 +50,8 @@ def buildShader(material, mname, texture_nodes):
                              typ="string")
 
             elif typ == 548341454 or typ == 3111105361:
-                print "binding PBR ", typ, " on material ", mname
+                if DEBUG_OUTPUT:
+                    print "binding PBR ", typ, " on material ", mname
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_PBR_map' % shader)
                 cmds.setAttr("%s.colorSpace" % file_node, "Raw",
@@ -56,37 +64,45 @@ def buildShader(material, mname, texture_nodes):
                 #                  force=True)
 
             elif typ == 3166598269:
-                print "binding emissive ", typ, " on material ", mname
+                if DEBUG_OUTPUT:
+                    print "binding emissive ", typ, " on material ", mname
                 cmds.setAttr("%s.use_emissive_map" % shader, 1)
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_emissive_map' % shader)
             elif typ == 3761386704:
-                print "binding AO ", typ, " on material ", mname
+                if DEBUG_OUTPUT:
+                    print "binding AO ", typ, " on material ", mname
                 # Need to figure this out. The AO map is a strength bit,
                 # not sure what Maya is expecting.
                 cmds.setAttr("%s.use_ao_map" % shader, 1)
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_ao_map' % shader)
             elif typ == 1140682086 or typ == 1482859648:
-                print "binding mask", typ, " on material ", mname
+                if DEBUG_OUTPUT:
+                    print "binding mask", typ, " on material ", mname
                 cmds.setAttr("%s.use_mask_map" % shader, 1)
                 cmds.connectAttr('%s.outColor' % file_node,
                                  '%s.TEX_mask_map' % shader)
             elif typ == 1557393490:
-                print ("material mask ", typ,
-                       " not yet implemented on material ", mname)
+                if DEBUG_OUTPUT:
+                    print ("material mask ", typ,
+                           " not yet implemented on material ", mname)
             elif typ == 3004687613:
-                print ("subsurface scattering ", typ,
-                       " not yet implemented on material ", mname)
+                if DEBUG_OUTPUT:
+                    print ("subsurface scattering ", typ,
+                           " not yet implemented on material ", mname)
             elif typ == 2337956496:
-                print ("anisotropy tangent ", typ,
-                       " not yet implemented on material ", mname)
+                if DEBUG_OUTPUT:
+                    print ("anisotropy tangent ", typ,
+                           " not yet implemented on material ", mname)
             elif typ == 1117188170:
-                print ("specular ", typ,
-                       " not yet implemented on material ", mname)
+                if DEBUG_OUTPUT:
+                    print ("specular ", typ,
+                           " not yet implemented on material ", mname)
             else:
-                print ("import_owmat: ignoring unknown "
-                       "texture type ", typ, " on material ", mname)
+                if DEBUG_OUTPUT:
+                    print ("import_owmat: ignoring unknown "
+                           "texture type ", typ, " on material ", mname)
 
         except Exception as e:
             print "Exception while materialing: %s" % e
