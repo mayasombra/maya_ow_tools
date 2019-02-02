@@ -14,6 +14,8 @@ from OWMImporter import import_owmat
 # debugging since a map takes several minutes to read.
 DEBUG_DATA_SIZE = 0
 
+LOG_MAP_DETAILS = False
+
 
 def instance_with_prs(name, source, parent, position, rotation, scale):
     nobj = cmds.instance(source.rsplit("|")[-1], name=name, leaf=True)
@@ -24,14 +26,14 @@ def instance_with_prs(name, source, parent, position, rotation, scale):
     cmds.scale(scale[0], scale[1], scale[2], nobj)
 
 
-def importModel(settings, obfile, obn):
+def importModel(settings, obfile, obn, obji):
     try:
         if settings.MapImportModelsAs == 1:
             if obfile.endswith(".owentity"):
                 print "OWEntity not yet supported. Filename: %s" % obfile
                 return None
             else:
-                return import_owmdl.read(obfile, settings)
+                return import_owmdl.read(obfile, settings, None, obji)
         else:
             return (cmds.spaceLocator(name=obn), "None")
 
@@ -82,7 +84,6 @@ def remove(obj):
 
 
 def readmap(settings, filename):
-    print "Reading Map..."
     root, file = os.path.split(filename)
 
     data = read_owmap.read(filename)
@@ -100,6 +101,7 @@ def readmap(settings, filename):
     collisionMat = import_owmat.buildCollision("CollisionPhysics")
 
     matCache = {}
+    objEntities = {}
     lightNum = 0
 
     if settings.MapImportModels and settings.MapImportObjectsLarge:
@@ -109,10 +111,31 @@ def readmap(settings, filename):
                             p=globObj)
         cmds.hide(refObj)
 
-        objCache = {}
-
         if DEBUG_DATA_SIZE:
             data.objects = data.objects[0:DEBUG_DATA_SIZE]
+
+        if LOG_MAP_DETAILS:
+            for ob in data.objects:
+                print "ob.model: ", ob.model, "entities: ", len(ob.entities)
+
+                for idx, ent in enumerate(ob.entities):
+                    material = None
+                    matpath = ent.material
+                    matpath = matpath.replace('\\', os.sep)
+                    if not os.path.isabs(matpath):
+                        matpath = os.path.normpath('%s/%s' % (root, matpath))
+                    if settings.MapImportMaterials and len(ent.material) > 0:
+                        if matpath not in matCache:
+                            print "cache miss"
+                            material = import_owmat.read(matpath)[0]
+                            matCache[matpath] = material
+                            print ["%016X" % key for key in material.keys()]
+                        else:
+                            print "cache hit"
+
+                            material = matCache[matpath]
+
+                    print "records: ", ent.recordCount
 
         for ob in data.objects:
             obfile = ob.model
@@ -120,34 +143,21 @@ def readmap(settings, filename):
             if not os.path.isabs(obfile):
                 obfile = os.path.normpath('%s/%s' % (root, obfile))
 
-            obn = "obj%s" % os.path.splitext(os.path.basename(obfile))[0]
-
-            obji = 0
-            if obn in objCache:
-                objfound = True
-                while objfound:
-                    obji = obji + 1
-                    if ("%s_%s" % (obn, obji) not in objCache):
-                        objfound = False
-
-            if obji > 0:
-                obn = "%s_%s" % (obn, obji)
-
-            # Either use the model or a placeholder object based on
-            # the settings.
-            if settings.MapImportModelsAs == 1:
-                obj = import_owmdl.read(obfile, settings, None, obji)
-            else:
-                obj = (cmds.spaceLocator(name=obn), "None")
-            objCache[obn] = obj
-
-            rlist = cmds.listRelatives(obj[0], allParents=True)
-            # print("rList: %s"%rlist)
-
-            if (rlist is None) or (refObj not in rlist):
-                cmds.parent(obj[0], refObj)
+            objbase = "obj%s" % os.path.splitext(os.path.basename(obfile))[0]
 
             for idx, ent in enumerate(ob.entities):
+                obji = objEntities.get(obfile, 0)
+                obn = "%s_%s" % (objbase, obji)
+                # Either use the model or a placeholder object based on
+                # the settings.
+                if settings.MapImportModelsAs == 1:
+                    obj = import_owmdl.read(obfile, settings, None, obji)
+                else:
+                    obj = (cmds.spaceLocator(name=obn), "None")
+                objEntities[obfile] = obji+1
+
+                cmds.parent(obj[0], refObj)
+
                 material = None
                 matpath = ent.material
                 matpath = matpath.replace('\\', os.sep)
@@ -187,8 +197,6 @@ def readmap(settings, filename):
                             p=globDet)
         cmds.hide(refDet)
 
-        objCache = {}
-
         mrec = {}
 
         if DEBUG_DATA_SIZE:
@@ -200,39 +208,24 @@ def readmap(settings, filename):
             if not os.path.isabs(obfile):
                 obfile = os.path.normpath('%s/%s' % (root, obfile))
 
-            obn = "detail%s" % os.path.splitext(os.path.basename(obfile))[0]
+            objbase = "detail%s" % os.path.splitext(
+                os.path.basename(obfile))[0]
 
-            if obn == 'detailphysics' and (
+            if objbase == 'detailphysics' and (
                 settings.MapImportObjectsPhysics == 0 or
                     settings.MapImportModelsAs == 2):
                 continue
 
-            obj = None
-            obji = 0
-            if obn in objCache:
-                objfound = True
-                obj = objCache[obn]
-                while objfound:
-                    obji = obji + 1
-                    if ("%s_%s" % (obn, obji) not in objCache):
-                        objfound = False
-
-            if obji > 0:
-                obn = "%s_%s" % (obn, obji)
-
+            obji = objEntities.get(obfile, 0)
+            obn = "%s_%s" % (objbase, obji)
+            obj = importModel(settings, obfile, obn, obji)
             if not obj:
-                obj = importModel(settings, obfile, obn)
-                if not obj:
-                    print ("Bad/Invalid Object: (%s:%s:%s). "
-                           "Skipping to next one..." % (obfile, obn, obji))
-                    continue
+                print ("Bad/Invalid Object: (%s:%s:%s). "
+                       "Skipping to next one..." % (obfile, obn, obji))
+                continue
 
-                objCache[obn] = obj
-
-            rlist = cmds.listRelatives(obj[0], allParents=True)
-
-            if (rlist is None) or (refDet not in rlist):
-                cmds.parent(obj[0], refDet)
+            objEntities[obfile] = obji+1
+            cmds.parent(obj[0], refDet)
 
             if settings.MapImportMaterials and len(ob.material) > 0:
                 matpath = ob.material
@@ -274,8 +267,6 @@ def readmap(settings, filename):
             pos = adjustAxis(light.position)
             ca = light.LightFOV
             if light.LightType == 1 and ca == -1.0:
-                print ("Light %s is a Spotlight with -1.0 cone angle. "
-                       "Defaulting to 45 degrees..." % lightName)
                 ca = 45
 
             # print "Name: %s\n    Position: %s\n    Rotation: %s\n    ",

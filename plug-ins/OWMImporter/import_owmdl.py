@@ -100,7 +100,9 @@ def importArmature(data, parentName):
             parent = skeleton.getName(bone.parent)
             bbone = skeleton.getObjname(bone.name)
 
-            if not parent:
+            # One immensely annoying attribute of the OWLib is that
+            # the first bone resolves as its own parent.
+            if not parent or parent == bone.name:
                 continue
 
             # Here, we account for multiple skeletons in the scene by
@@ -109,14 +111,10 @@ def importArmature(data, parentName):
             candidates = cmds.ls(parent, l=True)
             pbone = None
             for candidate in candidates:
-                path = candidate.split("|")
-                if armature in path:
+                if armature in candidate:
                     pbone = cmds.select(candidate)
 
-            # One immensely annoying attribute of the OWLib is that
-            # the first bone resolves as its own parent.
-            if parent is not None and parent != bone.name:
-                cmds.connectJoint(bbone, pbone, pm=True)
+            cmds.connectJoint(bbone, pbone, pm=True)
 
     if LOG_TIMING_STATS:
         print "importArmature(): ", time.time() - start
@@ -387,7 +385,7 @@ def readmdl(settings, filename, materials=None, instanceCount=0):
     if len(data.header.name) > 0:
         rootName = data.header.name
     rootName = MayaSafeName(rootName)
-    rootGroupName = ("root_%s_0" % rootName)
+    rootGroupName = ("root_%s_%d" % (rootName, instanceCount))
     rootObject = cmds.group(em=True, name=rootGroupName, w=True)
 
     armature = None
