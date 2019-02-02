@@ -3,7 +3,7 @@ import os.path
 import maya.cmds as cmds
 import maya.mel as mel
 
-from OWMImporter import import_owmdl, import_owmap
+from OWMImporter import import_owmdl, import_owmap, import_owentity
 
 
 def about_window():
@@ -59,15 +59,20 @@ def create_menu(hook):
 
         cmds.menuItem(label="Import OWMDL File",
                       annotation="Imports an OW Model File",
-                      command=lambda x: import_owmodel())
+                      command=lambda x: importModel())
 
         cmds.setParent(menu, menu=True)
 
         cmds.menuItem(label="Map", subMenu=True)
         cmds.menuItem(label="Import OWMAP File",
                       annotation="Imports an OW Map File",
-                      command=lambda x: import_owmapp())
+                      command=lambda x: importMap())
+        cmds.setParent(menu, menu=True)
 
+        cmds.menuItem(label="Entity", subMenu=True)
+        cmds.menuItem(label="Import OWENTITY File",
+                      annotation="Imports an OW Entity File",
+                      command=lambda x: importEntity())
         cmds.setParent(menu, menu=True)
 
         cmds.menuItem(divider=True)
@@ -140,14 +145,21 @@ def cs(k, v):
     settings.change_setting(k, v)
 
 
-def import_owmapp():
+def importEntity():
+    import_file = importfile_dialog(
+        "OWENTITY Files (*.owentity)", "Import OWENTITY")
+    if import_file:
+        import_owentity.read(import_file, settings.Settings)
+
+
+def importMap():
     import_file = importfile_dialog(
         "OWMAP Files (*.owmap)", "Import OWMAP")
     if import_file:
         import_owmap.read(import_file, settings.Settings)
 
 
-def import_owmodel():
+def importModel():
     import_file = importfile_dialog(
         "OWMDL Files (*.owmdl)", "Import OWMDL")
     if import_file:
