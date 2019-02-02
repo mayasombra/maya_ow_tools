@@ -6,7 +6,6 @@ renderers = ['Stingray', 'Redshift']
 class DefSettings:
         def __init__(self,
                      MapImportModels=1,
-                     MapImportTextures=1,
                      MapImportMaterials=1,
                      MapImportLights=1,
                      MapImportModelsAs=1,
@@ -18,8 +17,6 @@ class DefSettings:
                      ModelImportEmpties=0,
                      MapHideReferenceModels=1,
                      Renderer='Stingray'):
-            self.MapImportTextures = int(MapImportTextures)
-
             self.MapImportModels = int(MapImportModels)
             self.MapImportMaterials = int(MapImportMaterials)
             self.MapImportLights = int(MapImportLights)

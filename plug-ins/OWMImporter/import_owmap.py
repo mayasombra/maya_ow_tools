@@ -37,7 +37,9 @@ def importModel(settings, obfile, obn):
             else:
                 return import_owmdl.read(obfile, settings, None)
         else:
-            return (cmds.spaceLocator(name=obn), "None")
+            count = len(cmds.ls("%s_*" % obn))
+            obn = "%s_%d" % (obn, count)
+            return (cmds.spaceLocator(name=obn)[0], "None")
 
     except Exception as e:
         print "Error importing map object %s. Error: %s" % (obfile, e)
@@ -110,7 +112,8 @@ def readmap(settings, filename):
         globObj = cmds.group(em=True, n="%s_Objects" % rootName, p=rootObject)
         refObj = cmds.group(em=True, n="%s_ObjectReferences" % rootName,
                             p=globObj)
-        cmds.hide(refObj)
+        if settings.MapHideReferenceModels:
+            cmds.hide(refObj)
 
         if DEBUG_DATA_SIZE:
             data.objects = data.objects[0:DEBUG_DATA_SIZE]
@@ -149,11 +152,13 @@ def readmap(settings, filename):
             for idx, ent in enumerate(ob.entities):
                 # Either use the model or a placeholder object based on
                 # the settings.
+                cmds.select(refObj)
                 if settings.MapImportModelsAs == 1:
                     obj = import_owmdl.read(obfile, settings, None)
                 else:
-                    obn = "%s_0" % objbase
-                    obj = (cmds.spaceLocator(name=obn), "None")
+                    count = len(cmds.ls("%s_*" % objbase))
+                    obn = "%s_%d" % (objbase, count)
+                    obj = (cmds.spaceLocator(name=obn)[0], "None")
 
                 cmds.parent(obj[0], refObj)
 
@@ -194,7 +199,8 @@ def readmap(settings, filename):
         globDet = cmds.group(em=True, n="%s_Details" % rootName, p=rootObject)
         refDet = cmds.group(em=True, n="%s_DetailsReferences" % rootName,
                             p=globDet)
-        cmds.hide(refDet)
+        if settings.MapHideReferenceModels:
+            cmds.hide(refDet)
 
         if DEBUG_DATA_SIZE:
             data.details = data.details[0:DEBUG_DATA_SIZE]
@@ -213,7 +219,7 @@ def readmap(settings, filename):
                     settings.MapImportModelsAs == 2):
                 continue
 
-            obj = importModel(settings, obfile, objbase+"_0")
+            obj = importModel(settings, obfile, objbase)
             if not obj:
                 print ("Bad/Invalid Object: (%s:%s). "
                        "Skipping to next one..." % (obfile, obn))

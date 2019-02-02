@@ -6,6 +6,9 @@ import maya.mel as mel
 from OWMImporter import import_owmdl, import_owmap, import_owentity
 
 
+model_options = ['Models', 'Locators']
+
+
 def about_window():
     """Present the about information"""
     cmds.confirmDialog(
@@ -92,14 +95,8 @@ def create_menu(hook):
 def options_menu():
     window = cmds.window(t='Overwatch Model Import Configuration')
     cmds.columnLayout(adj=True)
-    cmds.text(l='TODO: none of these options except Model Renderer '
-              'actually do anything yet')
     cmds.frameLayout(cll=True, label='Global Options')
     cmds.columnLayout()
-    cmds.checkBox(l='Import Textures',
-                  v=int(settings.get_setting('MapImportTextures')),
-                  cc=lambda x: settings.change_setting('MapImportTextures', x),
-                  en=True)
     cmds.checkBox(l='Hide Reference Models', v=True)
     cmds.setParent('..')
     cmds.setParent('..')
@@ -116,6 +113,29 @@ def options_menu():
                      cc3=lambda x: cs('MapImportLights', x),
                      en3=True)
     cmds.setParent('..')
+    ima = cmds.optionMenu(l='Import Models As',
+                          cc=lambda x: cs('MapImportModelsAs',
+                                          model_options.index(x)+1))
+    cmds.menuItem(l='Models', ann='Loads the models for the level.')
+    cmds.menuItem(l='Locators', ann='Replaces models with a locator (null) '
+                  'with the proper location, rotation, and scale.')
+    cmds.optionMenu(ima, e=True,
+                    sl=settings.get_setting('MapImportModelsAs'))
+
+    cmds.setParent('..')
+    cmds.checkBoxGrp(ncb=3, l='Object Import: ',
+                     la3=['Large Models', 'Detail Models', 'Physics Model'],
+                     ann='Large models are for buildings, trees, and '
+                         'landscapes. Detail models are for video games, '
+                         'cars, and laptops. The Physics model is used for '
+                         'collision detection.',
+                     v1=int(settings.get_setting('MapImportObjectsLarge')),
+                     v2=int(settings.get_setting('MapImportObjectsDetail')),
+                     v3=int(settings.get_setting('MapImportObjectsPhysics')),
+                     cc1=lambda x: cs('MapImportObjectsLarge', x),
+                     cc2=lambda x: cs('MapImportObjectsDetail', x),
+                     cc3=lambda x: cs('MapImportObjectsPhysics', x),
+                     en3=False)
     cmds.setParent('..')
     cmds.frameLayout(cll=True, label='Render Options')
     cmds.columnLayout()
