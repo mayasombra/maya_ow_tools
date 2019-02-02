@@ -1,5 +1,6 @@
 import os
 import math
+import time
 import maya.cmds as cmds
 from maya.api.OpenMaya import MQuaternion as Quaternion
 from maya.api.OpenMaya import MEulerRotation as Euler
@@ -221,8 +222,8 @@ def readmap(settings, filename):
 
             obj = importModel(settings, obfile, objbase)
             if not obj:
-                print ("Bad/Invalid Object: (%s:%s). "
-                       "Skipping to next one..." % (obfile, obn))
+                print ("Bad/Invalid Object: %s. "
+                       "Skipping to next one..." % obfile)
                 continue
 
             cmds.parent(obj[0], refDet)
@@ -309,6 +310,11 @@ def readmap(settings, filename):
 def read(infilename, inputsettings):
     settings = inputsettings
 
+    if LOG_MAP_DETAILS:
+        print "loading ", infilename
+    start = time.time()
     status = readmap(settings, infilename)
     cmds.select(d=True)
+    if LOG_MAP_DETAILS:
+        print "time elapsed: ", time.time() - start
     return status

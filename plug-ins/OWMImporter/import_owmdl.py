@@ -421,9 +421,9 @@ def readmdl(settings, filename, materials=None):
     return (rootObject, armature, meshes, empties, data)
 
 
-def read(filename, settings, materials=None, instanceCount=0):
+def read(filename, settings, materials=None):
     start = time.time()
-    status = readmdl(settings, filename, materials, instanceCount)
+    status = readmdl(settings, filename, materials)
     if LOG_TIMING_STATS:
         print "loading time: ", time.time() - start
     cmds.select(d=True)

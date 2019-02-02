@@ -86,7 +86,7 @@ def buildRedshift(material, mname, texture_nodes):
         # dictionary above can be expanded by the user.
         typName = tt.get(typ, "Undefined")
 
-        print "working on", typName
+        # print "working on", typName
         if typName in ['DiffuseAO', 'DiffuseOpacity', 'DiffuseBlack',
                        'DiffusePlant', 'DiffuseFlag', 'Diffuse2']:
             # print "binding color"
