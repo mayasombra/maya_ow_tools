@@ -8,6 +8,7 @@ from OWMImporter.commonfuncs import adjustAxis, wadjustAxis, MayaSafeName
 from OWMImporter import read_owmap
 from OWMImporter import import_owmdl
 from OWMImporter import import_owmat
+from OWMImporter import import_owentity
 
 
 # Set to a non-zero value to limit reading objects. This helps
@@ -26,14 +27,15 @@ def instance_with_prs(name, source, parent, position, rotation, scale):
     cmds.scale(scale[0], scale[1], scale[2], nobj)
 
 
-def importModel(settings, obfile, obn, obji):
+def importModel(settings, obfile, obn):
     try:
         if settings.MapImportModelsAs == 1:
             if obfile.endswith(".owentity"):
-                print "OWEntity not yet supported. Filename: %s" % obfile
-                return None
+                obj = import_owentity.read(obfile, settings, True)
+                obj = (obj[0], obj[2][1], obj[2][2], obj[2][3], obj[2][4])
+                return obj
             else:
-                return import_owmdl.read(obfile, settings, None, obji)
+                return import_owmdl.read(obfile, settings, None)
         else:
             return (cmds.spaceLocator(name=obn), "None")
 
@@ -101,7 +103,6 @@ def readmap(settings, filename):
     collisionMat = import_owmat.buildCollision("CollisionPhysics")
 
     matCache = {}
-    objEntities = {}
     lightNum = 0
 
     if settings.MapImportModels and settings.MapImportObjectsLarge:
@@ -146,15 +147,13 @@ def readmap(settings, filename):
             objbase = "obj%s" % os.path.splitext(os.path.basename(obfile))[0]
 
             for idx, ent in enumerate(ob.entities):
-                obji = objEntities.get(obfile, 0)
-                obn = "%s_%s" % (objbase, obji)
                 # Either use the model or a placeholder object based on
                 # the settings.
                 if settings.MapImportModelsAs == 1:
-                    obj = import_owmdl.read(obfile, settings, None, obji)
+                    obj = import_owmdl.read(obfile, settings, None)
                 else:
+                    obn = "%s_0" % objbase
                     obj = (cmds.spaceLocator(name=obn), "None")
-                objEntities[obfile] = obji+1
 
                 cmds.parent(obj[0], refObj)
 
@@ -197,8 +196,6 @@ def readmap(settings, filename):
                             p=globDet)
         cmds.hide(refDet)
 
-        mrec = {}
-
         if DEBUG_DATA_SIZE:
             data.details = data.details[0:DEBUG_DATA_SIZE]
 
@@ -209,22 +206,19 @@ def readmap(settings, filename):
                 obfile = os.path.normpath('%s/%s' % (root, obfile))
 
             objbase = "detail%s" % os.path.splitext(
-                os.path.basename(obfile))[0]
+                os.path.basename(obfile))[0].replace('.003', '')
 
             if objbase == 'detailphysics' and (
                 settings.MapImportObjectsPhysics == 0 or
                     settings.MapImportModelsAs == 2):
                 continue
 
-            obji = objEntities.get(obfile, 0)
-            obn = "%s_%s" % (objbase, obji)
-            obj = importModel(settings, obfile, obn, obji)
+            obj = importModel(settings, obfile, objbase+"_0")
             if not obj:
-                print ("Bad/Invalid Object: (%s:%s:%s). "
-                       "Skipping to next one..." % (obfile, obn, obji))
+                print ("Bad/Invalid Object: (%s:%s). "
+                       "Skipping to next one..." % (obfile, obn))
                 continue
 
-            objEntities[obfile] = obji+1
             cmds.parent(obj[0], refDet)
 
             if settings.MapImportMaterials and len(ob.material) > 0:
@@ -241,17 +235,14 @@ def readmap(settings, filename):
                 if settings.MapImportModelsAs == 1:
                     # Only attempt to texture Models
                     import_owmdl.bindMaterials(obj[2], obj[4], material)
-            if settings.MapImportMaterials and obn == 'detailphysics':
+            if settings.MapImportMaterials and objbase == 'detailphysics':
                 import_owmdl.bindMaterials(obj[2], obj[4], collisionMat)
                 # cmds.polyAutoProjection(
                 # obj[0], lm=1, pb=True, ibd=True, cm=False,
                 # l=0, sc=1, o=1, ps=0.2, ws=False)
 
-            if obn not in mrec:
-                mrec[obn] = 0
-
-            name = "%s_%i" % (obn, mrec[obn])
-            mrec[obn] = mrec[obn] + 1
+            mrec = len(cmds.ls(objbase+"*"))
+            name = "%s_%i" % (objbase, mrec)
             instance_with_prs(name, obj[0], globDet,
                               ob.position, ob.rotation, ob.scale)
 

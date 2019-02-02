@@ -333,3 +333,49 @@ class OWMAPSound:
         self.position = position
         self.soundCount = soundCount
         self.sounds = sounds
+
+
+class OWEntityFile:
+    def __init__(self, header, file, model, effect, idx,
+                 model_idx, effect_idx, children):
+        self.header = header
+        self.file = file
+        self.model = model
+        self.effect = effect
+        self.index = idx
+        self.model_index = model_idx
+        self.effect_index = effect_idx
+        self.children = children
+
+
+class OWEntityHeader:
+    structFormat = [str, '<HH', str, str, str, '<IIIi']
+
+    def __init__(self, magic, major, minor, guid, model_guid,
+                 effect_guid, idx, model_idx, effect_idx, child_count):
+        self.magic = magic
+        self.major = major
+        self.minor = minor
+        self.guid = guid
+        self.model_guid = model_guid
+        self.effect_guid = effect_guid
+        self.child_count = child_count
+        self.index = idx
+        self.model_index = model_idx
+        self.effect_index = effect_idx
+
+
+class OWEntityChild:
+    structFormat = [str, '<QQII', str]
+
+    def __init__(self, file, hardpoint, var, hp_index, var_index, attachment):
+        self.file = file
+        self.hardpoint = hardpoint
+        self.var = var
+        self.attachment = attachment
+        self.var_index = var_index
+        self.hardpoint_index = hp_index
+
+    def __repr__(self):
+        return '<OWEntityChild: {} (attached to:{})>'.format(
+            self.file, self.attachment)

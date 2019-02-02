@@ -17,6 +17,7 @@ from OWMImporter import import_owmat
 LOG_TIMING_STATS = False
 LOG_DEBUG_STATS = False
 LOG_SKIN_DETAILS = False
+LOG_EMPTY_DETAILS = False
 
 
 class Skeleton:
@@ -367,7 +368,7 @@ def influenceObjects(skinCluster):
 
 # TODO: the hardpoint importing code was removed. No idea what to do yet.
 
-def readmdl(settings, filename, materials=None, instanceCount=0):
+def readmdl(settings, filename, materials=None):
     currentlinear = cmds.currentUnit(query=True, linear=True)
     currentangle = cmds.currentUnit(query=True, angle=True)
     cmds.currentUnit(linear="cm", angle="deg")
@@ -385,6 +386,7 @@ def readmdl(settings, filename, materials=None, instanceCount=0):
     if len(data.header.name) > 0:
         rootName = data.header.name
     rootName = MayaSafeName(rootName)
+    instanceCount = len(cmds.ls("root_%s_*" % rootName))
     rootGroupName = ("root_%s_%d" % (rootName, instanceCount))
     rootObject = cmds.group(em=True, name=rootGroupName, w=True)
 
@@ -404,8 +406,13 @@ def readmdl(settings, filename, materials=None, instanceCount=0):
         bindMaterials(meshes, data, materials)
 
     empties = []
-    # if settings.ModelImportEmpties and data.header.emptyCount > 0:
-    #    empties = importEmpties()
+    if settings.ModelImportEmpties and data.header.emptyCount > 0:
+        if LOG_EMPTY_DETAILS:
+            for emp in data.empties:
+                print "emp.name: ", emp.name
+                print "emp.position: ", emp.position
+                print "emp.rotation: ", emp.rotation
+                print "emp.hardpoint: ", emp.hardpoint
 
     # if impMat:
     #    import_owmat.cleanUnusedMaterials(materials)
