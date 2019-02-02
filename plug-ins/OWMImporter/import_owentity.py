@@ -31,5 +31,6 @@ def read(filename, settings, import_children=True, is_child=False):
             child_file = os.path.normpath(os.path.join(
                 root, "..", child.file, child.file+'.owentity'))
             child_object, child_data, child_mdl = read(child_file, settings, True, True)
+            cmds.parent(child_object, entityObject)
 
     return entityObject, data, baseModel
