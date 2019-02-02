@@ -15,9 +15,12 @@ def buildShader(material, mname, texture_nodes):
     cmds.shaderfx(sfxnode=shader, initShaderAttributes=True)
 
     shader_dir = os.path.dirname(os.path.realpath(__file__))
-    material.shader = 44  # FIXME!!!
     shader_file = os.path.join(
         shader_dir, ('ow_shader_%d.sfx' % material.shader))
+
+    # If the shader isn't implemented, use #44 as it's pretty good.
+    if not os.path.isfile(shader_file):
+        shader_file = os.path.join(shader_dir, 'ow_shader_44.sfx')
 
     cmds.shaderfx(sfxnode=shader, loadGraph=shader_file)
     cmds.connectAttr('%s.outColor' % shader, '%s.surfaceShader' % shadinggroup,
