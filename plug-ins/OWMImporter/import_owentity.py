@@ -13,7 +13,8 @@ def read(filename, settings, import_children=True, is_child=False):
     if data is None:
         return None, None
 
-    entityObject = None
+    entityGroupName = ("entity_%s_0" % entity)
+    entityObject = cmds.group(em=True, name=entityGroupName, w=True)
     baseModel = None
 
     if data.model != 'null':
@@ -22,15 +23,14 @@ def read(filename, settings, import_children=True, is_child=False):
         modelFile = os.path.normpath(modelFile)
 
         baseModel = import_owmdl.read(modelFile, settings)
-        entityGroupName = ("entity_%s_0" % entity)
-        entityObject = cmds.group(em=True, name=entityGroupName, w=True)
         cmds.parent(baseModel[0], entityObject)
 
     if import_children:
         for child in data.children:
             child_file = os.path.normpath(os.path.join(
                 root, "..", child.file, child.file+'.owentity'))
-            child_object, child_data, child_mdl = read(child_file, settings, True, True)
+            child_object, child_data, child_mdl = read(
+                child_file, settings, True, True)
             cmds.parent(child_object, entityObject)
 
     return entityObject, data, baseModel
