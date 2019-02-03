@@ -66,7 +66,11 @@ def bind_node(realpath, textureList):
     if fn in textureList:
         file_node = textureList[fn]
     else:
-        if not cmds.objExists(fn):
+        # For loading maps, it's a good idea to use just the
+        # base name (which is globally unique because of the export
+        # process). This keeps us from having many copies of the same
+        # input textures.
+        if not cmds.objExists(finame):
             file_node = cmds.shadingNode(
                 'file', name=finame, asTexture=True)
             textureUV = cmds.shadingNode(
