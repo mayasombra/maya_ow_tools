@@ -95,19 +95,28 @@ def create_menu(hook):
 def options_menu():
     window = cmds.window(t='Overwatch Model Import Configuration')
     cmds.columnLayout(adj=True)
-    cmds.frameLayout(cll=True, label='Global Options')
-    cmds.columnLayout()
-    cmds.checkBox(l='Hide Reference Models', v=True)
-    cmds.setParent('..')
-    cmds.setParent('..')
     cmds.frameLayout(cll=True, label='Model Options')
+    cmds.columnLayout()
+    cmds.checkBoxGrp(ncb=3, l='Model Import: ',
+                     la3=['Materials', 'Bones', 'Empties'],
+                     ann='Choose what to import.',
+                     v1=settings.get_setting('ModelImportMaterials'),
+                     v2=settings.get_setting('ModelImportBones'),
+                     v3=settings.get_setting('ModelImportEmpties'),
+                     cc1=lambda x: cs('ModelImportMaterials', x),
+                     cc2=lambda x: cs('ModelImportBones', x),
+                     cc3=lambda x: cs('ModelImportEmpties', x),
+                     en3=False)
+    cmds.setParent('..')
+    cmds.setParent('..')
+    cmds.frameLayout(cll=True, label='Map Options')
     cmds.columnLayout()
     cmds.checkBoxGrp(ncb=3, l='Maps Import: ',
                      la3=['Models', 'Materials', 'Lights Objects'],
                      ann='Choose what to import.',
-                     v1=int(settings.get_setting('MapImportModels')),
-                     v2=int(settings.get_setting('MapImportMaterials')),
-                     v3=int(settings.get_setting('MapImportLights')),
+                     v1=settings.get_setting('MapImportModels'),
+                     v2=settings.get_setting('MapImportMaterials'),
+                     v3=settings.get_setting('MapImportLights'),
                      cc1=lambda x: cs('MapImportModels', x),
                      cc2=lambda x: cs('MapImportMaterials', x),
                      cc3=lambda x: cs('MapImportLights', x),
@@ -136,6 +145,11 @@ def options_menu():
                      cc2=lambda x: cs('MapImportObjectsDetail', x),
                      cc3=lambda x: cs('MapImportObjectsPhysics', x),
                      en3=False)
+    cmds.setParent('..')
+    cmds.columnLayout()
+    cmds.checkBox(l='Hide Reference Models',
+                  v=settings.get_setting('MapHideReferenceModels'),
+                  cc=lambda x: cs('MapHideReferenceModels', x))
     cmds.setParent('..')
     cmds.frameLayout(cll=True, label='Render Options')
     cmds.columnLayout()
@@ -169,7 +183,7 @@ def importEntity():
     import_file = importfile_dialog(
         "OWENTITY Files (*.owentity)", "Import OWENTITY")
     if import_file:
-        import_owentity.read(import_file, settings.Settings)
+        import_owentity.read(import_file, settings.Settings, True)
 
 
 def importMap():
