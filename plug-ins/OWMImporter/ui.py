@@ -150,6 +150,9 @@ def options_menu():
     cmds.checkBox(l='Hide Reference Models',
                   v=settings.get_setting('MapHideReferenceModels'),
                   cc=lambda x: cs('MapHideReferenceModels', x))
+    cmds.checkBox(l='Hide Game Control Objects',
+                  v=settings.get_setting('MapHideGameControlObjects'),
+                  cc=lambda x: cs('MapHideGameControlObjects', x))
     cmds.setParent('..')
     cmds.frameLayout(cll=True, label='Render Options')
     cmds.columnLayout()

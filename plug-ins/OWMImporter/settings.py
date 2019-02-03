@@ -16,6 +16,7 @@ class DefSettings:
                      ModelImportBones=1,
                      ModelImportEmpties=0,
                      MapHideReferenceModels=1,
+                     MapHideGameControlObjects=1,
                      Renderer='Stingray'):
             self.MapImportModels = int(MapImportModels)
             self.MapImportMaterials = int(MapImportMaterials)
@@ -31,6 +32,7 @@ class DefSettings:
             self.ModelImportEmpties = int(ModelImportEmpties)
 
             self.MapHideReferenceModels = int(MapHideReferenceModels)
+            self.MapHideGameControlObjects = int(MapHideGameControlObjects)
 
             self.Renderer = Renderer
 
