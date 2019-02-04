@@ -17,15 +17,27 @@ from OWMImporter import import_owentity
 DEBUG_DATA_SIZE = 0
 
 LOG_MAP_DETAILS = False
+LOG_LOADING_DETAILS = True
 
 
-def instance_with_prs(name, source, parent, position, rotation, scale):
+def hasHidableTexture(material):
+    for t in material[1].keys():
+        if '000000001B8D' in t:
+            return True
+        if '000000001BA4' in t:
+            return True
+
+    return False
+
+
+def instanceWithPrs(name, source, parent, position, rotation, scale):
     nobj = cmds.instance(source.rsplit("|")[-1], name=name, leaf=True)
     cmds.parent(nobj[0], parent)
     loc = adjustAxis(position)
     cmds.move(loc[0], loc[1], loc[2], nobj)
     quatrotate(nobj[0], wadjustAxis(rotation))
     cmds.scale(scale[0], scale[1], scale[2], nobj)
+    return nobj[0]
 
 
 def importModel(settings, obfile, obn):
@@ -126,21 +138,22 @@ def readmap(settings, filename):
                 for idx, ent in enumerate(ob.entities):
                     material = None
                     matpath = ent.material
+                    print "matpath: ", matpath
                     matpath = matpath.replace('\\', os.sep)
                     if not os.path.isabs(matpath):
                         matpath = os.path.normpath('%s/%s' % (root, matpath))
                     if settings.MapImportMaterials and len(ent.material) > 0:
                         if matpath not in matCache:
-                            print "cache miss"
-                            material = import_owmat.read(matpath)[0]
+                            material = import_owmat.read(matpath)
                             matCache[matpath] = material
-                            print ["%016X" % key for key in material.keys()]
+                            print "mats: ",
+                            print ["%016X" % key for key in material[0].keys()]
+                            print "hideModel: ", hasHidableTexture(material)
                         else:
-                            print "cache hit"
-
                             material = matCache[matpath]
 
                     print "records: ", ent.recordCount
+            return None
 
         for ob in data.objects:
             obfile = ob.model
@@ -163,20 +176,24 @@ def readmap(settings, filename):
 
                 cmds.parent(obj[0], refObj)
 
+                hideModel = False
                 material = None
                 matpath = ent.material
                 matpath = matpath.replace('\\', os.sep)
+                matKey = matpath.split('\\')[-1]
                 if not os.path.isabs(matpath):
                     matpath = os.path.normpath('%s/%s' % (root, matpath))
                 if settings.MapImportMaterials and len(ent.material) > 0:
-                    if matpath not in matCache:
-                        material = import_owmat.read(matpath)[0]
-                        matCache[matpath] = material
+                    if matKey not in matCache:
+                        material = import_owmat.read(matpath)
+                        matCache[matKey] = material
                     else:
-                        material = matCache[matpath]
+                        material = matCache[matKey]
+
+                    hideModel = hasHidableTexture(material)
                     if settings.MapImportModelsAs == 1:
                         # Only attempt to texture Models
-                        import_owmdl.bindMaterials(obj[2], obj[4], material)
+                        import_owmdl.bindMaterials(obj[2], obj[4], material[0])
                 else:
                     if settings.MapImportModelsAs == 1:
                         # Only attempt to texture Models
@@ -187,13 +204,16 @@ def readmap(settings, filename):
                     os.path.splitext(os.path.basename(matpath))[0])
                 matObj = cmds.group(
                     em=True, name=matObjName, parent=globObj)
+                if hideModel and settings.MapHideGameControlObjects:
+                    cmds.hide(matObj)
 
                 mrec = len(cmds.ls("obj%s_*" % matID))
                 for idx2, rec in enumerate(ent.records):
                     name = "obj%s_%i" % (matID, mrec)
                     mrec += 1
-                    instance_with_prs(name, obj[0], matObj,
-                                      rec.position, rec.rotation, rec.scale)
+                    inst = instanceWithPrs(
+                        name, obj[0], matObj,
+                        rec.position, rec.rotation, rec.scale)
 
     if settings.MapImportModels and settings.MapImportObjectsDetail:
         # print "Exporting Detail Objects"
@@ -228,20 +248,25 @@ def readmap(settings, filename):
 
             cmds.parent(obj[0], refDet)
 
+            hideModel = False
             if settings.MapImportMaterials and len(ob.material) > 0:
                 matpath = ob.material
                 matpath = matpath.replace('\\', os.sep)
+                matKey = matpath.split('\\')[-1]
                 if not os.path.isabs(matpath):
                     matpath = os.path.normpath('%s/%s' % (root, matpath))
                 material = None
-                if matpath not in matCache:
-                    material = import_owmat.read(matpath)[0]
-                    matCache[matpath] = material
+                if matKey not in matCache:
+                    material = import_owmat.read(matpath)
+                    matCache[matKey] = material
                 else:
-                    material = matCache[matpath]
+                    material = matCache[matKey]
                 if settings.MapImportModelsAs == 1:
                     # Only attempt to texture Models
-                    import_owmdl.bindMaterials(obj[2], obj[4], material)
+                    import_owmdl.bindMaterials(obj[2], obj[4], material[0])
+
+                hideModel = hasHidableTexture(material)
+
             if settings.MapImportMaterials and objbase == 'detailphysics':
                 import_owmdl.bindMaterials(obj[2], obj[4], collisionMat)
                 # cmds.polyAutoProjection(
@@ -250,8 +275,10 @@ def readmap(settings, filename):
 
             mrec = len(cmds.ls(objbase+"*"))
             name = "%s_%i" % (objbase, mrec)
-            instance_with_prs(name, obj[0], globDet,
-                              ob.position, ob.rotation, ob.scale)
+            inst = instanceWithPrs(
+                name, obj[0], globDet, ob.position, ob.rotation, ob.scale)
+            if hideModel and settings.MapHideGameControlObjects:
+                cmds.hide(inst)
 
     if settings.MapImportLights and len(data.lights) > 0:
         lightlist = [None] * len(data.lights)
@@ -310,11 +337,11 @@ def readmap(settings, filename):
 def read(infilename, inputsettings):
     settings = inputsettings
 
-    if LOG_MAP_DETAILS:
+    if LOG_LOADING_DETAILS:
         print "loading ", infilename
     start = time.time()
     status = readmap(settings, infilename)
     cmds.select(d=True)
-    if LOG_MAP_DETAILS:
+    if LOG_LOADING_DETAILS:
         print "time elapsed: ", time.time() - start
     return status
