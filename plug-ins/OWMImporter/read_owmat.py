@@ -85,7 +85,8 @@ def read(filename, sub=False):
                 if major >= 1 and minor >= 1:
                     y = ord(stream.read(1))
                 if major >= 1 and minor >= 2:
-                    properType = bin_ops.readFmtFlat(stream, [owm_types.OWMATMaterial.typeFormat[0]])
+                    properType = bin_ops.readFmtFlat(
+                        stream, [owm_types.OWMATMaterial.typeFormat[0]])
                 textures += [(t, y, properType)]
             materials += [owm_types.OWMATMaterial(key, textureCount, textures)]
 
