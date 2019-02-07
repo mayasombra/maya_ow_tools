@@ -3,7 +3,8 @@ import os.path
 import maya.cmds as cmds
 import maya.mel as mel
 
-from OWMImporter import import_owmdl, import_owmap, import_owentity
+from OWMImporter import import_owmdl, import_owmap
+from OWMImporter import import_owentity, import_owmat
 
 
 model_options = ['Models', 'Locators']
@@ -78,6 +79,11 @@ def create_menu(hook):
                       command=lambda x: importEntity())
         cmds.setParent(menu, menu=True)
 
+        cmds.menuItem(label="Material", subMenu=True)
+        cmds.menuItem(label="Import OWMAT File",
+                      annotation="Imports an OW Material File",
+                      command=lambda x: importMaterial())
+        cmds.setParent(menu, menu=True)
         cmds.menuItem(divider=True)
 
         cmds.setParent(menu, menu=True)
@@ -180,6 +186,13 @@ def options_menu():
 
 def cs(k, v):
     settings.change_setting(k, v)
+
+
+def importMaterial():
+    import_file = importfile_dialog(
+        "OWMAT Files (*.owmat)", "Import OWMAT")
+    if import_file:
+        m, textureList = import_owmat.read(import_file)
 
 
 def importEntity():
