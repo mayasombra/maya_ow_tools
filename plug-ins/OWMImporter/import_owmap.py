@@ -21,11 +21,12 @@ LOG_LOADING_DETAILS = True
 
 
 def hasHidableTexture(material):
-    for t in material[1].keys():
-        if '000000001B8D' in t:
-            return True
-        if '000000001BA4' in t:
-            return True
+    t = material[1].values()
+    print "material:", material[0].values()[0], "materialTextures:", t
+    if 'img_000000001B8D' in t:
+        return True
+    if 'img_000000001BA4' in t:
+        return True
 
     return False
 
@@ -119,9 +120,19 @@ def readmap(settings, filename):
 
     matCache = {}
     lightNum = 0
+    matTime = 0
+    matCount = 0
+    instTime = 0
+    instCount = 0
+    objTime = 0
+    objCount = 0
 
+    # Sort these objects so we can cache previous computation.
+    # Improves load performance by about 4x
+    data.details.sort(key=lambda x: x.model)
     if settings.MapImportModels and settings.MapImportObjectsLarge:
-        # print "Exporting Large Objects"
+        if LOG_LOADING_DETAILS:
+            print "Importing Large Objects"
         globObj = cmds.group(em=True, n="%s_Objects" % rootName, p=rootObject)
         refObj = cmds.group(em=True, n="%s_ObjectReferences" % rootName,
                             p=globObj)
@@ -132,61 +143,76 @@ def readmap(settings, filename):
             data.objects = data.objects[0:DEBUG_DATA_SIZE]
 
         if LOG_MAP_DETAILS:
+            print "data.objects"
             for ob in data.objects:
-                print "ob.model: ", ob.model, "entities: ", len(ob.entities)
+                print "LARGE ob.model:", ob.model,
+                print "entities:", len(ob.entities)
 
                 for idx, ent in enumerate(ob.entities):
                     material = None
-                    matpath = ent.material
-                    print "matpath: ", matpath
-                    matpath = matpath.replace('\\', os.sep)
-                    if not os.path.isabs(matpath):
-                        matpath = os.path.normpath('%s/%s' % (root, matpath))
+                    matPath = ent.material
+                    print "\tmatPath: ", matPath,
+                    matPath = matPath.replace('\\', os.sep)
+                    if not os.path.isabs(matPath):
+                        matPath = os.path.normpath('%s/%s' % (root, matPath))
                     if settings.MapImportMaterials and len(ent.material) > 0:
-                        if matpath not in matCache:
-                            material = import_owmat.read(matpath)
-                            matCache[matpath] = material
-                            print "mats: ",
-                            print ["%016X" % key for key in material[0].keys()]
-                            print "hideModel: ", hasHidableTexture(material)
+                        if matPath not in matCache:
+                            material = import_owmat.read(matPath)
+                            matCache[matPath] = material
+                            # print "mats: ",
+                            # print ["%016X" % k for k in material[0].keys()]
+                            # print "hideModel: ", hasHidableTexture(material)
                         else:
-                            material = matCache[matpath]
+                            material = matCache[matPath]
 
                     print "records: ", ent.recordCount
-            return None
+
+            print "data.details"
+            prevKey = None
+            for ob in data.details:
+                if ob.model != prevKey:
+                    print "DETAILS ob.model", ob.model, "mat:", ob.material
+                    prevKey = ob.model
 
         for ob in data.objects:
+            objStart = time.time()
             obfile = ob.model
             obfile = obfile.replace('\\', os.sep)
             if not os.path.isabs(obfile):
                 obfile = os.path.normpath('%s/%s' % (root, obfile))
 
             objbase = "obj%s" % os.path.splitext(os.path.basename(obfile))[0]
+            objTime += time.time() - objStart
 
             for idx, ent in enumerate(ob.entities):
+                objStart = time.time()
                 # Either use the model or a placeholder object based on
                 # the settings.
                 cmds.select(refObj)
                 if settings.MapImportModelsAs == 1:
                     obj = import_owmdl.read(obfile, settings, None)
+                    objCount += 1
                 else:
                     count = len(cmds.ls("%s_*" % objbase))
                     obn = "%s_%d" % (objbase, count)
                     obj = (cmds.spaceLocator(name=obn)[0], "None")
 
                 cmds.parent(obj[0], refObj)
+                objTime += time.time() - objStart
 
+                matStart = time.time()
                 hideModel = False
                 material = None
-                matpath = ent.material
-                matpath = matpath.replace('\\', os.sep)
-                matKey = matpath.split('\\')[-1]
-                if not os.path.isabs(matpath):
-                    matpath = os.path.normpath('%s/%s' % (root, matpath))
+                matPath = ent.material
+                matPath = matPath.replace('\\', os.sep)
+                matKey = matPath.split('\\')[-1]
+                if not os.path.isabs(matPath):
+                    matPath = os.path.normpath('%s/%s' % (root, matPath))
                 if settings.MapImportMaterials and len(ent.material) > 0:
                     if matKey not in matCache:
-                        material = import_owmat.read(matpath)
+                        material = import_owmat.read(matPath)
                         matCache[matKey] = material
+                        matCount += 1
                     else:
                         material = matCache[matKey]
 
@@ -199,24 +225,34 @@ def readmap(settings, filename):
                         # Only attempt to texture Models
                         import_owmdl.bindMaterials(obj[2], obj[4], "lambert1")
 
-                matID = os.path.splitext(os.path.basename(matpath))[0]
+                matID = os.path.splitext(os.path.basename(matPath))[0]
                 matObjName = "mat%s" % (
-                    os.path.splitext(os.path.basename(matpath))[0])
+                    os.path.splitext(os.path.basename(matPath))[0])
                 matObj = cmds.group(
                     em=True, name=matObjName, parent=globObj)
                 if hideModel and settings.MapHideGameControlObjects:
                     cmds.hide(matObj)
 
                 mrec = len(cmds.ls("obj%s_*" % matID))
+                matTime += time.time() - matStart
+                instStart = time.time()
                 for idx2, rec in enumerate(ent.records):
                     name = "obj%s_%i" % (matID, mrec)
                     mrec += 1
                     inst = instanceWithPrs(
                         name, obj[0], matObj,
                         rec.position, rec.rotation, rec.scale)
+                    instCount += 1
+                instTime += time.time() - instStart
+
+    if LOG_LOADING_DETAILS:
+        print "objTime:", objTime, "objCount:", objCount
+        print "matTime:", matTime, "matCount:", matCount
+        print "instTime:", instTime, "instCount:", instCount
 
     if settings.MapImportModels and settings.MapImportObjectsDetail:
-        # print "Exporting Detail Objects"
+        if LOG_LOADING_DETAILS:
+            print "Importing Detail Objects"
         globDet = cmds.group(em=True, n="%s_Details" % rootName, p=rootObject)
         refDet = cmds.group(em=True, n="%s_DetailsReferences" % rootName,
                             p=globDet)
@@ -226,61 +262,83 @@ def readmap(settings, filename):
         if DEBUG_DATA_SIZE:
             data.details = data.details[0:DEBUG_DATA_SIZE]
 
+        # Remember the previous object/material instantiated.
+        # If the next object (they are sorted) is the same, we
+        # can just instance from the previous one. This reduces
+        # the import load substantially.
+        prev = (None, None)
+        obj = None
+        # This is sticky with the object, and changes only when prev does.
+        hideModel = False
         for ob in data.details:
-            obfile = ob.model
-            obfile = obfile.replace('\\', os.sep)
-            if not os.path.isabs(obfile):
-                obfile = os.path.normpath('%s/%s' % (root, obfile))
+            if prev != (ob.model, ob.material):
+                objStart = time.time()
+                objCount += 1
+                obfile = ob.model
+                obfile = obfile.replace('\\', os.sep)
+                if not os.path.isabs(obfile):
+                    obfile = os.path.normpath('%s/%s' % (root, obfile))
 
-            objbase = "detail%s" % os.path.splitext(
-                os.path.basename(obfile))[0].replace('.003', '')
+                objbase = "detail%s" % os.path.splitext(
+                    os.path.basename(obfile))[0].replace('.003', '')
 
-            if objbase == 'detailphysics' and (
-                settings.MapImportObjectsPhysics == 0 or
-                    settings.MapImportModelsAs == 2):
-                continue
+                if objbase == 'detailphysics' and (
+                    settings.MapImportObjectsPhysics == 0 or
+                        settings.MapImportModelsAs == 2):
+                    continue
 
-            obj = importModel(settings, obfile, objbase)
-            if not obj:
-                print ("Bad/Invalid Object: %s. "
-                       "Skipping to next one..." % obfile)
-                continue
+                obj = importModel(settings, obfile, objbase)
+                if not obj:
+                    print ("Bad/Invalid Object: %s. "
+                           "Skipping to next one..." % obfile)
+                    continue
+                cmds.parent(obj[0], refDet)
 
-            cmds.parent(obj[0], refDet)
+                objTime += time.time() - objStart
 
-            hideModel = False
-            if settings.MapImportMaterials and len(ob.material) > 0:
-                matpath = ob.material
-                matpath = matpath.replace('\\', os.sep)
-                matKey = matpath.split('\\')[-1]
-                if not os.path.isabs(matpath):
-                    matpath = os.path.normpath('%s/%s' % (root, matpath))
-                material = None
-                if matKey not in matCache:
-                    material = import_owmat.read(matpath)
-                    matCache[matKey] = material
-                else:
-                    material = matCache[matKey]
-                if settings.MapImportModelsAs == 1:
-                    # Only attempt to texture Models
-                    import_owmdl.bindMaterials(obj[2], obj[4], material[0])
+                matStart = time.time()
+                if settings.MapImportMaterials and len(ob.material) > 0:
+                    matPath = ob.material
+                    matPath = matPath.replace('\\', os.sep)
+                    matKey = matPath.split('\\')[-1]
+                    if not os.path.isabs(matPath):
+                        matPath = os.path.normpath('%s/%s' % (root, matPath))
+                    material = None
+                    if matKey not in matCache:
+                        material = import_owmat.read(matPath)
+                        matCache[matKey] = material
+                    else:
+                        material = matCache[matKey]
+                    if settings.MapImportModelsAs == 1:
+                        # Only attempt to texture Models
+                        import_owmdl.bindMaterials(obj[2], obj[4], material[0])
 
-                hideModel = hasHidableTexture(material)
+                    hideModel = hasHidableTexture(material)
 
-            if settings.MapImportMaterials and objbase == 'detailphysics':
-                import_owmdl.bindMaterials(obj[2], obj[4], collisionMat)
-                # cmds.polyAutoProjection(
-                # obj[0], lm=1, pb=True, ibd=True, cm=False,
-                # l=0, sc=1, o=1, ps=0.2, ws=False)
+                if settings.MapImportMaterials and objbase == 'detailphysics':
+                    import_owmdl.bindMaterials(obj[2], obj[4], collisionMat)
+                    # cmds.polyAutoProjection(
+                    # obj[0], lm=1, pb=True, ibd=True, cm=False,
+                    # l=0, sc=1, o=1, ps=0.2, ws=False)
 
+                matTime += time.time() - matStart
+            prev = (ob.model, ob.material)
+
+            instStart = time.time()
             mrec = len(cmds.ls(objbase+"*"))
             name = "%s_%i" % (objbase, mrec)
             inst = instanceWithPrs(
                 name, obj[0], globDet, ob.position, ob.rotation, ob.scale)
             if hideModel and settings.MapHideGameControlObjects:
                 cmds.hide(inst)
+            instTime += time.time() - instStart
+    if LOG_LOADING_DETAILS:
+        print "objTime:", objTime, "objCount:", objCount
+        print "matTime:", matTime, "matCount:", matCount
+        print "instTime:", instTime, "instCount:", instCount
 
     if settings.MapImportLights and len(data.lights) > 0:
+        lightStart = time.time()
         lightlist = [None] * len(data.lights)
         for light in data.lights:
             color, inten = normalizeColor(light.Color)
@@ -332,6 +390,8 @@ def readmap(settings, filename):
 
         cmds.group(tuple(lightlist), n="%s_Lights" % rootName,
                    p=rootObject)
+        if LOG_LOADING_DETAILS:
+            print "lightTime: ", time.time() - lightStart
 
 
 def read(infilename, inputsettings):
@@ -340,8 +400,20 @@ def read(infilename, inputsettings):
     if LOG_LOADING_DETAILS:
         print "loading ", infilename
     start = time.time()
-    status = readmap(settings, infilename)
-    cmds.select(d=True)
-    if LOG_LOADING_DETAILS:
-        print "time elapsed: ", time.time() - start
-    return status
+
+    # Materials are decoupled from the objects since they may have
+    # different materials. We load the materials as a separate step.
+    # Therefore, in this module, we suppress the behavior of having
+    # models load their own mats. We restore the original setting when we exit
+    # even in the event of failure.
+    origModelImportMaterials = settings.ModelImportMaterials
+
+    try:
+        settings.ModelImportMaterials = False
+        status = readmap(settings, infilename)
+        cmds.select(d=True)
+        if LOG_LOADING_DETAILS:
+            print "time elapsed: ", time.time() - start
+        return status
+    finally:
+        settings.ModelImportMaterials = origModelImportMaterials
