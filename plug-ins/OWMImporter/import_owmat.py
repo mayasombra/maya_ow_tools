@@ -1,3 +1,4 @@
+import json
 import os
 import maya.cmds as cmds
 
@@ -78,31 +79,39 @@ def bind_node(realpath, textureList):
                 name=("place2dTexture_%s" % name), asUtility=True)
             cmds.connectAttr(("%s.outUV" % textureUV),
                              '%s.uvCoord' % file_node)
-            textureList[fn] = file_node
             cmds.setAttr(("%s.fileTextureName" % file_node),
                          realpath, type="string")
         else:
             file_node = finame
+            realpath = cmds.getAttr("%s.fileTextureName" % file_node)
+            fn, fext = os.path.splitext(realpath)
+        textureList[fn] = file_node
     return file_node, name
 
 
 def read(filename, prefix=''):
-    textureList = {}
     # Normalize the filename for OS-independent separators
     filename = filename.replace('\\', os.sep)
 
     root, file = os.path.split(filename)
     data = read_owmat.read(filename)
     if not data:
-        return None
+        return None, None
 
     m = {}
-
+    textureList = {}
     for material in data.materials:
         mname = 'Mat_%s%016X' % (prefix, material.key)
         if cmds.objExists(mname):
             shader = mname
         else:
-            shader = buildShader(root, mname, material, textureList)
+            localTextures = {}
+            shader = buildShader(root, mname, material, localTextures)
+            cmds.addAttr(mname,
+                         ln="textureList", dt='string')
+            cmds.setAttr(mname+".textureList",
+                         json.dumps(localTextures), type='string')
+        localTextures = json.loads(cmds.getAttr(mname+".textureList"))
+        textureList.update(localTextures)
         m[material.key] = shader
     return m, textureList
