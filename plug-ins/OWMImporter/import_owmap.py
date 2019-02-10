@@ -22,7 +22,6 @@ LOG_LOADING_DETAILS = True
 
 def hasHidableTexture(material):
     t = material[1].values()
-    print "material:", material[0].values()[0], "materialTextures:", t
     if 'img_000000001B8D' in t:
         return True
     if 'img_000000001BA4' in t:
@@ -118,7 +117,6 @@ def readmap(settings, filename):
     rootObject = cmds.group(em=True, name=rootGroupName, w=True)
     collisionMat = import_owmat.buildCollision("CollisionPhysics")
 
-    matCache = {}
     lightNum = 0
     matTime = 0
     matCount = 0
@@ -155,15 +153,6 @@ def readmap(settings, filename):
                     matPath = matPath.replace('\\', os.sep)
                     if not os.path.isabs(matPath):
                         matPath = os.path.normpath('%s/%s' % (root, matPath))
-                    if settings.MapImportMaterials and len(ent.material) > 0:
-                        if matPath not in matCache:
-                            material = import_owmat.read(matPath)
-                            matCache[matPath] = material
-                            # print "mats: ",
-                            # print ["%016X" % k for k in material[0].keys()]
-                            # print "hideModel: ", hasHidableTexture(material)
-                        else:
-                            material = matCache[matPath]
 
                     print "records: ", ent.recordCount
 
@@ -209,13 +198,7 @@ def readmap(settings, filename):
                 if not os.path.isabs(matPath):
                     matPath = os.path.normpath('%s/%s' % (root, matPath))
                 if settings.MapImportMaterials and len(ent.material) > 0:
-                    if matKey not in matCache:
-                        material = import_owmat.read(matPath)
-                        matCache[matKey] = material
-                        matCount += 1
-                    else:
-                        material = matCache[matKey]
-
+                    material = import_owmat.read(matPath, obj[0])
                     hideModel = hasHidableTexture(material)
                     if settings.MapImportModelsAs == 1:
                         # Only attempt to texture Models
@@ -279,7 +262,7 @@ def readmap(settings, filename):
                 if not os.path.isabs(obfile):
                     obfile = os.path.normpath('%s/%s' % (root, obfile))
 
-                objbase = "detail%s" % os.path.splitext(
+                objbase = "detail_%s" % os.path.splitext(
                     os.path.basename(obfile))[0].replace('.003', '')
 
                 if objbase == 'detailphysics' and (
@@ -304,11 +287,7 @@ def readmap(settings, filename):
                     if not os.path.isabs(matPath):
                         matPath = os.path.normpath('%s/%s' % (root, matPath))
                     material = None
-                    if matKey not in matCache:
-                        material = import_owmat.read(matPath)
-                        matCache[matKey] = material
-                    else:
-                        material = matCache[matKey]
+                    material = import_owmat.read(matPath, objbase)
                     if settings.MapImportModelsAs == 1:
                         # Only attempt to texture Models
                         import_owmdl.bindMaterials(obj[2], obj[4], material[0])

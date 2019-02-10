@@ -39,6 +39,9 @@ def buildShader(root, mname, material, textureList):
             texture, root, textureList)
         texture_nodes[typ] = (file_node, name, realpath)
 
+    if cmds.objExists(mname):
+        return "%sSG" % mname
+
     if settings.get_setting('Renderer') == 'Redshift':
         return redshift.buildRedshift(material, mname, texture_nodes)
 
@@ -101,17 +104,25 @@ def read(filename, prefix=''):
     m = {}
     textureList = {}
     for material in data.materials:
-        mname = 'Mat_%s%016X' % (prefix, material.key)
+        mname = 'Mat_%016X' % material.key
+        if prefix:
+            if '_' in prefix:
+                idx = prefix.index('_')+1
+                mname = 'Mat_%s_%016X' % (prefix[idx:], material.key)
+            else:
+                print "unexpected prefix:", prefix
+                continue
+
         if cmds.objExists(mname):
-            shader = mname
+            shader = mname + "SG"
         else:
             localTextures = {}
             shader = buildShader(root, mname, material, localTextures)
-            cmds.addAttr(mname,
-                         ln="textureList", dt='string')
-            cmds.setAttr(mname+".textureList",
-                         json.dumps(localTextures), type='string')
-        localTextures = json.loads(cmds.getAttr(mname+".textureList"))
+            cmds.addAttr(shader,
+                     ln="textureList", dt='string')
+            cmds.setAttr(shader+".textureList",
+                        json.dumps(localTextures), type='string')
+        localTextures = json.loads(cmds.getAttr(shader+".textureList"))
         textureList.update(localTextures)
         m[material.key] = shader
     return m, textureList
