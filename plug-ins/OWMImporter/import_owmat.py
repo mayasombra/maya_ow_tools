@@ -104,11 +104,12 @@ def read(filename, prefix=''):
     m = {}
     textureList = {}
     for material in data.materials:
-        mname = 'Mat_%016X' % material.key
+        mname = 'Mat_%s_%016X' % (material.shader, material.key)
         if prefix:
             if '_' in prefix:
                 idx = prefix.index('_')+1
-                mname = 'Mat_%s_%016X' % (prefix[idx:], material.key)
+                mname = 'Mat_%s_%s_%016X' % (
+                    prefix[idx:], material.shader, material.key)
             else:
                 print "unexpected prefix:", prefix
                 continue
@@ -118,10 +119,9 @@ def read(filename, prefix=''):
         else:
             localTextures = {}
             shader = buildShader(root, mname, material, localTextures)
-            cmds.addAttr(shader,
-                     ln="textureList", dt='string')
+            cmds.addAttr(shader, ln="textureList", dt='string')
             cmds.setAttr(shader+".textureList",
-                        json.dumps(localTextures), type='string')
+                         json.dumps(localTextures), type='string')
         localTextures = json.loads(cmds.getAttr(shader+".textureList"))
         textureList.update(localTextures)
         m[material.key] = shader
