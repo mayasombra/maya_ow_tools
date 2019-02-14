@@ -104,8 +104,22 @@ def buildShader(material, mname, texture_nodes):
                            " not yet implemented on material ", mname)
             else:
                 if DEBUG_OUTPUT:
-                    print ("import_owmat: ignoring unknown "
+                    print ("import_owmat: stashing unknown "
                            "texture type ", typ, " on material ", mname)
+                unusedTex = "unused_%s" % mname
+                if not cmds.objExists(unusedTex):
+                    cmds.shadingNode(
+                        "layeredTexture", asTexture=1, name=unusedTex)
+                    cmds.connectAttr("%s.outColor" % unusedTex,
+                                     "%s.base_color" % mname)
+                # find next free slot and connect the texture to it
+                count = 0
+                inputs = cmds.listAttr("%s.inputs" % unusedTex,
+                                       m=True, st="color")
+                if inputs:
+                    count = len(inputs)
+                cmds.connectAttr("%s.outColor" % file_node,
+                                 "%s.inputs[%s].color" % (unusedTex, count))
 
         except Exception as e:
             print "Exception while materialing: %s" % e

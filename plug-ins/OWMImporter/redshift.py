@@ -209,9 +209,10 @@ def buildRedshift(material, mname, texture_nodes):
                                  "%s.ms_color2" % mname)
             # find next free slot and connect the texture to it
             count = 0
-            while cmds.listConnections("%s.inputs[%s].color" % (
-                    unusedTex, count)):
-                count += 1
+            inputs = cmds.listAttr("%s.inputs" % unusedTex,
+                                   m=True, st="color")
+            if inputs:
+                count = len(inputs)
             cmds.connectAttr("%s.outColor" % file_node,
                              "%s.inputs[%s].color" % (unusedTex, count))
 
